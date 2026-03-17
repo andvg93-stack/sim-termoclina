@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Water Column Stratification Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <p class="eyebrow">Interactive limnology laboratory</p>
+        <h1>Water Column Stratification Lab</h1>
+        <p class="subtitle">Explore how climate forcing shapes thermal layers, oxygen gradients, nutrient cycling, and aquatic ecosystem stress.</p>
+      </div>
+      <div class="topbar-controls">
+        <label class="field compact">
+          <span>Scenario</span>
+          <select id="scenario-select"></select>
+        </label>
+        <label class="field compact">
+          <span>Mode</span>
+          <select id="mode-select">
+            <option value="free">Free exploration</option>
+            <option value="guided">Guided scenarios</option>
+            <option value="compare">Compare mode</option>
+          </select>
+        </label>
+        <div class="button-row">
+          <button id="play-btn" class="primary">Pause</button>
+          <button id="reset-btn">Reset</button>
+          <button id="guide-btn">How to use</button>
+        </div>
+        <label class="field compact">
+          <span>Speed</span>
+          <select id="speed-select">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+            <option value="8">8x</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="scene-panel card">
+        <div class="panel-header">
+          <div>
+            <h2>Lake cross-section</h2>
+            <p>Side-view of the stratified water column and ecological stress patterns.</p>
+          </div>
+          <div class="scene-tools">
+            <label class="segmented">
+              <input type="radio" name="color-mode" value="temperature" checked>
+              <span>Temperature</span>
+            </label>
+            <label class="segmented">
+              <input type="radio" name="color-mode" value="oxygen">
+              <span>Oxygen</span>
+            </label>
+            <label class="segmented">
+              <input type="radio" name="color-mode" value="nutrients">
+              <span>Nutrients</span>
+            </label>
+            <label class="segmented">
+              <input type="radio" name="color-mode" value="stability">
+              <span>Stability</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="scene-wrap">
+          <canvas id="lake-canvas" width="980" height="520" aria-label="Lake stratification scene"></canvas>
+          <div id="layer-tooltip" class="layer-tooltip" hidden></div>
+        </div>
+
+        <div class="scene-footer">
+          <div class="legend" id="legend"></div>
+          <div class="scene-kpis" id="status-cards"></div>
+        </div>
+      </section>
+
+      <aside class="controls-panel card">
+        <div class="panel-header">
+          <div>
+            <h2>Controls</h2>
+            <p>Adjust forcing, water body properties, and display options.</p>
+          </div>
+        </div>
+        <div id="controls-root" class="accordion"></div>
+      </aside>
+
+      <section class="analytics-panel card">
+        <div class="panel-header">
+          <div>
+            <h2>Profiles and indicators</h2>
+            <p>Depth profiles update live as the simulated water column evolves.</p>
+          </div>
+        </div>
+        <div class="chart-grid">
+          <figure class="chart-card">
+            <figcaption>Temperature vs depth</figcaption>
+            <canvas id="temp-chart" width="320" height="220"></canvas>
+          </figure>
+          <figure class="chart-card">
+            <figcaption>Dissolved oxygen vs depth</figcaption>
+            <canvas id="oxygen-chart" width="320" height="220"></canvas>
+          </figure>
+          <figure class="chart-card">
+            <figcaption>Nutrients vs depth</figcaption>
+            <canvas id="nutrient-chart" width="320" height="220"></canvas>
+          </figure>
+          <figure class="chart-card wide">
+            <figcaption>System evolution</figcaption>
+            <canvas id="time-chart" width="680" height="220"></canvas>
+          </figure>
+        </div>
+        <div class="alerts-section">
+          <div class="section-heading">
+            <h3>Ecological alerts</h3>
+            <p>Automated interpretations of the current system state.</p>
+          </div>
+          <div id="alerts-list" class="alerts-list"></div>
+        </div>
+      </section>
+
+      <section class="education-panel card">
+        <div class="panel-header">
+          <div>
+            <h2>Explanation layer</h2>
+            <p>Interpret the observed cause-effect chain.</p>
+          </div>
+        </div>
+        <div class="education-grid">
+          <article class="explanation-card">
+            <h3>What is happening?</h3>
+            <p id="explain-what"></p>
+          </article>
+          <article class="explanation-card">
+            <h3>Why is it happening?</h3>
+            <p id="explain-why"></p>
+          </article>
+          <article class="explanation-card">
+            <h3>Ecological consequence</h3>
+            <p id="explain-impact"></p>
+          </article>
+          <article class="explanation-card scientific-basis">
+            <h3>Scientific basis</h3>
+            <p>This simulator uses a simplified layer model. Heating, cooling, wind mixing, respiration, photosynthesis, settling, and internal nutrient release are represented with tuned educational relationships rather than full hydrodynamics.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="compare-panel card" id="compare-panel" hidden>
+        <div class="panel-header">
+          <div>
+            <h2>Compare mode</h2>
+            <p>Baseline scenario versus the actively modified scenario.</p>
+          </div>
+        </div>
+        <div class="compare-grid">
+          <div class="compare-card">
+            <h3>Temperature profile</h3>
+            <canvas id="compare-temp-chart" width="320" height="240"></canvas>
+          </div>
+          <div class="compare-card">
+            <h3>Oxygen profile</h3>
+            <canvas id="compare-oxygen-chart" width="320" height="240"></canvas>
+          </div>
+          <div class="compare-card">
+            <h3>Status</h3>
+            <div id="compare-status" class="compare-status"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="guide-modal" class="modal">
+    <article class="modal-card">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">How to use</p>
+          <h2>Read the lake like a limnologist</h2>
+        </div>
+        <button id="close-guide-btn" class="icon-btn" aria-label="Close guide">×</button>
+      </div>
+      <div class="modal-content">
+        <p>Use the scenario selector to start from a known condition, then modify climate, mixing, and water-quality controls. Watch how the colored layers, thermocline line, and depth profiles respond.</p>
+        <p>Hover over the lake to inspect each depth layer. The charts show how temperature, oxygen, and nutrients separate vertically. Alerts explain when the system approaches hypoxia, bloom risk, or turnover.</p>
+        <p>Switch to compare mode to see how your modifications diverge from the baseline scenario while keeping the same educational storyline.</p>
+      </div>
+    </article>
+  </dialog>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

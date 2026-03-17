@@ -1,0 +1,229 @@
+[
+  {
+    "scenario": "summer_stable",
+    "elapsedDays": 16,
+    "surfaceTemp": 32.5,
+    "bottomOxygen": 0,
+    "layerSample": [
+      {
+        "depth": 0.6,
+        "temperature": 32.5,
+        "oxygen": 8.1,
+        "nutrients": 0.55
+      },
+      {
+        "depth": 1.9,
+        "temperature": 31.1,
+        "oxygen": 7.9,
+        "nutrients": 0.68
+      },
+      {
+        "depth": 3.1,
+        "temperature": 29.5,
+        "oxygen": 7.4,
+        "nutrients": 0.82
+      },
+      {
+        "depth": 4.4,
+        "temperature": 27.8,
+        "oxygen": 7,
+        "nutrients": 0.96
+      }
+    ],
+    "alerts": [
+      "A stable thermocline has formed",
+      "Bottom layers have entered hypoxia",
+      "Anoxia is developing near the sediments",
+      "Internal nutrient release is likely increasing",
+      "Fish habitat is compressed"
+    ]
+  },
+  {
+    "scenario": "oligotrophic_lake",
+    "elapsedDays": 16,
+    "surfaceTemp": 28.4,
+    "bottomOxygen": 2.41,
+    "layerSample": [
+      {
+        "depth": 0.8,
+        "temperature": 28.4,
+        "oxygen": 8.3,
+        "nutrients": 0.4
+      },
+      {
+        "depth": 2.4,
+        "temperature": 27.6,
+        "oxygen": 8.4,
+        "nutrients": 0.44
+      },
+      {
+        "depth": 4,
+        "temperature": 26.6,
+        "oxygen": 8.5,
+        "nutrients": 0.47
+      },
+      {
+        "depth": 5.5,
+        "temperature": 25.5,
+        "oxygen": 8.4,
+        "nutrients": 0.51
+      }
+    ],
+    "alerts": [
+      "A stable thermocline has formed",
+      "Deep water oxygen is decreasing"
+    ]
+  },
+  {
+    "scenario": "eutrophic_reservoir",
+    "elapsedDays": 16,
+    "surfaceTemp": 29,
+    "bottomOxygen": 0,
+    "layerSample": [
+      {
+        "depth": 0.5,
+        "temperature": 29,
+        "oxygen": 8.1,
+        "nutrients": 1.22
+      },
+      {
+        "depth": 1.5,
+        "temperature": 28.5,
+        "oxygen": 7.6,
+        "nutrients": 1.37
+      },
+      {
+        "depth": 2.5,
+        "temperature": 26.7,
+        "oxygen": 5.3,
+        "nutrients": 1.95
+      },
+      {
+        "depth": 3.5,
+        "temperature": 25.3,
+        "oxygen": 4.7,
+        "nutrients": 2.33
+      }
+    ],
+    "alerts": [
+      "A stable thermocline has formed",
+      "Bottom layers have entered hypoxia",
+      "Anoxia is developing near the sediments",
+      "Internal nutrient release is likely increasing",
+      "Algal bloom risk is high",
+      "Fish habitat is compressed"
+    ]
+  },
+  {
+    "scenario": "autumn_turnover",
+    "elapsedDays": 45,
+    "surfaceTemp": 7.6,
+    "bottomOxygen": 0,
+    "layerSample": [
+      {
+        "depth": 0.5,
+        "temperature": 7.6,
+        "oxygen": 10.9,
+        "nutrients": 2.71
+      },
+      {
+        "depth": 1.6,
+        "temperature": 7.6,
+        "oxygen": 10.9,
+        "nutrients": 2.71
+      },
+      {
+        "depth": 2.7,
+        "temperature": 7.6,
+        "oxygen": 10.9,
+        "nutrients": 2.71
+      },
+      {
+        "depth": 3.8,
+        "temperature": 7.6,
+        "oxygen": 10.8,
+        "nutrients": 2.71
+      }
+    ],
+    "alerts": [
+      "The water column is close to full mixing",
+      "Bottom layers have entered hypoxia",
+      "Anoxia is developing near the sediments"
+    ]
+  },
+  {
+    "scenario": "wind_mixing",
+    "elapsedDays": 16,
+    "surfaceTemp": 17.6,
+    "bottomOxygen": 0,
+    "layerSample": [
+      {
+        "depth": 0.5,
+        "temperature": 17.6,
+        "oxygen": 8.5,
+        "nutrients": 1.79
+      },
+      {
+        "depth": 1.6,
+        "temperature": 17.6,
+        "oxygen": 8.4,
+        "nutrients": 1.79
+      },
+      {
+        "depth": 2.7,
+        "temperature": 17.5,
+        "oxygen": 8.4,
+        "nutrients": 1.79
+      },
+      {
+        "depth": 3.8,
+        "temperature": 17.5,
+        "oxygen": 8.4,
+        "nutrients": 1.79
+      }
+    ],
+    "alerts": [
+      "The water column is close to full mixing",
+      "Bottom layers have entered hypoxia",
+      "Anoxia is developing near the sediments"
+    ]
+  },
+  {
+    "scenario": "rainfall_pulse",
+    "elapsedDays": 16,
+    "surfaceTemp": 15.6,
+    "bottomOxygen": 0,
+    "layerSample": [
+      {
+        "depth": 0.5,
+        "temperature": 15.6,
+        "oxygen": 9,
+        "nutrients": 1.85
+      },
+      {
+        "depth": 1.4,
+        "temperature": 15.5,
+        "oxygen": 9,
+        "nutrients": 1.85
+      },
+      {
+        "depth": 2.3,
+        "temperature": 15.5,
+        "oxygen": 8.9,
+        "nutrients": 1.85
+      },
+      {
+        "depth": 3.2,
+        "temperature": 15.5,
+        "oxygen": 8.9,
+        "nutrients": 1.85
+      }
+    ],
+    "alerts": [
+      "The water column is close to full mixing",
+      "Bottom layers have entered hypoxia",
+      "Anoxia is developing near the sediments",
+      "Internal nutrient release is likely increasing"
+    ]
+  }
+]

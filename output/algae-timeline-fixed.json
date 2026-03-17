@@ -1,0 +1,490 @@
+{
+  "summer_stable": [
+    {
+      "checkpoint": 0,
+      "targetDays": 0,
+      "state": {
+        "scenario": "summer_stable",
+        "elapsedDays": 0,
+        "stratificationState": "Strongly stratified",
+        "thermoclineDepth": 8.8,
+        "mixedDepth": 1.9,
+        "surfaceTemp": 26.9,
+        "middleTemp": 11.9,
+        "bottomTemp": 11.4,
+        "bottomOxygen": 4.51,
+        "surfaceNutrients": 0.53,
+        "surfaceAlgae": 0.78,
+        "bloomRisk": 0.35,
+        "fishRefugeThickness": 15,
+        "habitatCompression": false,
+        "densityInversions": 0,
+        "alerts": [
+          "A stable thermocline has formed"
+        ],
+        "layerSample": [
+          {
+            "depth": 0.6,
+            "temperature": 26.9,
+            "oxygen": 8.7,
+            "nutrients": 0.31
+          },
+          {
+            "depth": 1.9,
+            "temperature": 26.5,
+            "oxygen": 8.6,
+            "nutrients": 0.34
+          },
+          {
+            "depth": 3.1,
+            "temperature": 26,
+            "oxygen": 8.5,
+            "nutrients": 0.39
+          },
+          {
+            "depth": 4.4,
+            "temperature": 25.1,
+            "oxygen": 8.4,
+            "nutrients": 0.46
+          }
+        ],
+        "coordinateSystem": "Lake scene canvas origin at top-left; depth increases downward."
+      }
+    },
+    {
+      "checkpoint": 0.5,
+      "targetDays": 80,
+      "state": {
+        "scenario": "summer_stable",
+        "elapsedDays": 80,
+        "stratificationState": "Strongly stratified",
+        "thermoclineDepth": 7.5,
+        "mixedDepth": 0.6,
+        "surfaceTemp": 33,
+        "middleTemp": 13.8,
+        "bottomTemp": 11.5,
+        "bottomOxygen": 0,
+        "surfaceNutrients": 3.49,
+        "surfaceAlgae": 1.24,
+        "bloomRisk": 0.94,
+        "fishRefugeThickness": 0,
+        "habitatCompression": false,
+        "densityInversions": 0,
+        "alerts": [
+          "A stable thermocline has formed",
+          "Bottom layers have entered hypoxia",
+          "Anoxia is developing near the sediments",
+          "Algal bloom risk is high"
+        ],
+        "layerSample": [
+          {
+            "depth": 0.6,
+            "temperature": 33,
+            "oxygen": 8.2,
+            "nutrients": 1.59
+          },
+          {
+            "depth": 1.9,
+            "temperature": 33,
+            "oxygen": 5.6,
+            "nutrients": 2.96
+          },
+          {
+            "depth": 3.1,
+            "temperature": 33,
+            "oxygen": 0.1,
+            "nutrients": 3.72
+          },
+          {
+            "depth": 4.4,
+            "temperature": 33,
+            "oxygen": 0,
+            "nutrients": 3.95
+          }
+        ],
+        "coordinateSystem": "Lake scene canvas origin at top-left; depth increases downward."
+      }
+    },
+    {
+      "checkpoint": 1,
+      "targetDays": 160,
+      "state": {
+        "scenario": "summer_stable",
+        "elapsedDays": 160,
+        "stratificationState": "Strongly stratified",
+        "thermoclineDepth": 10,
+        "mixedDepth": 0.6,
+        "surfaceTemp": 33,
+        "middleTemp": 15.9,
+        "bottomTemp": 11.7,
+        "bottomOxygen": 0,
+        "surfaceNutrients": 4.04,
+        "surfaceAlgae": 1.98,
+        "bloomRisk": 1.09,
+        "fishRefugeThickness": 0,
+        "habitatCompression": false,
+        "densityInversions": 0,
+        "alerts": [
+          "A stable thermocline has formed",
+          "Bottom layers have entered hypoxia",
+          "Anoxia is developing near the sediments",
+          "Algal bloom risk is high"
+        ],
+        "layerSample": [
+          {
+            "depth": 0.6,
+            "temperature": 33,
+            "oxygen": 8.1,
+            "nutrients": 0.98
+          },
+          {
+            "depth": 1.9,
+            "temperature": 33,
+            "oxygen": 6.7,
+            "nutrients": 2.4
+          },
+          {
+            "depth": 3.1,
+            "temperature": 33,
+            "oxygen": 0,
+            "nutrients": 4.93
+          },
+          {
+            "depth": 4.4,
+            "temperature": 33,
+            "oxygen": 0,
+            "nutrients": 5
+          }
+        ],
+        "coordinateSystem": "Lake scene canvas origin at top-left; depth increases downward."
+      }
+    }
+  ],
+  "oligotrophic_lake": [
+    {
+      "checkpoint": 0,
+      "targetDays": 0,
+      "state": {
+        "scenario": "oligotrophic_lake",
+        "elapsedDays": 0,
+        "stratificationState": "Strongly stratified",
+        "thermoclineDepth": 11.1,
+        "mixedDepth": 4,
+        "surfaceTemp": 24.3,
+        "middleTemp": 10.3,
+        "bottomTemp": 9.5,
+        "bottomOxygen": 7.36,
+        "surfaceNutrients": 0.14,
+        "surfaceAlgae": 0.35,
+        "bloomRisk": 0.24,
+        "fishRefugeThickness": 38,
+        "habitatCompression": false,
+        "densityInversions": 0,
+        "alerts": [
+          "A stable thermocline has formed"
+        ],
+        "layerSample": [
+          {
+            "depth": 0.8,
+            "temperature": 24.3,
+            "oxygen": 9.4,
+            "nutrients": 0.08
+          },
+          {
+            "depth": 2.4,
+            "temperature": 24.1,
+            "oxygen": 9.3,
+            "nutrients": 0.09
+          },
+          {
+            "depth": 4,
+            "temperature": 23.7,
+            "oxygen": 9.3,
+            "nutrients": 0.09
+          },
+          {
+            "depth": 5.5,
+            "temperature": 23.1,
+            "oxygen": 9.2,
+            "nutrients": 0.1
+          }
+        ],
+        "coordinateSystem": "Lake scene canvas origin at top-left; depth increases downward."
+      }
+    },
+    {
+      "checkpoint": 0.5,
+      "targetDays": 90,
+      "state": {
+        "scenario": "oligotrophic_lake",
+        "elapsedDays": 90,
+        "stratificationState": "Strongly stratified",
+        "thermoclineDepth": 11.1,
+        "mixedDepth": 2.4,
+        "surfaceTemp": 33,
+        "middleTemp": 13.4,
+        "bottomTemp": 10,
+        "bottomOxygen": 0,
+        "surfaceNutrients": 2.73,
+        "surfaceAlgae": 0.02,
+        "bloomRisk": 0.79,
+        "fishRefugeThickness": 0,
+        "habitatCompression": false,
+        "densityInversions": 0,
+        "alerts": [
+          "A stable thermocline has formed",
+          "Bottom layers have entered hypoxia",
+          "Anoxia is developing near the sediments",
+          "Internal nutrient release is likely increasing",
+          "Algal bloom risk is high"
+        ],
+        "layerSample": [
+          {
+            "depth": 0.8,
+            "temperature": 33,
+            "oxygen": 8.2,
+            "nutrients": 2.36
+          },
+          {
+            "depth": 2.4,
+            "temperature": 33,
+            "oxygen": 8,
+            "nutrients": 2.36
+          },
+          {
+            "depth": 4,
+            "temperature": 33,
+            "oxygen": 5.9,
+            "nutrients": 2.5
+          },
+          {
+            "depth": 5.5,
+            "temperature": 33,
+            "oxygen": 4.7,
+            "nutrients": 2.6
+          }
+        ],
+        "coordinateSystem": "Lake scene canvas origin at top-left; depth increases downward."
+      }
+    },
+    {
+      "checkpoint": 1,
+      "targetDays": 180,
+      "state": {
+        "scenario": "oligotrophic_lake",
+        "elapsedDays": 180,
+        "stratificationState": "Strongly stratified",
+        "thermoclineDepth": 12.7,
+        "mixedDepth": 2.4,
+        "surfaceTemp": 33,
+        "middleTemp": 16.7,
+        "bottomTemp": 10.6,
+        "bottomOxygen": 0,
+        "surfaceNutrients": 4.82,
+        "surfaceAlgae": 0.02,
+        "bloomRisk": 0.79,
+        "fishRefugeThickness": 0,
+        "habitatCompression": false,
+        "densityInversions": 0,
+        "alerts": [
+          "A stable thermocline has formed",
+          "Bottom layers have entered hypoxia",
+          "Anoxia is developing near the sediments",
+          "Algal bloom risk is high"
+        ],
+        "layerSample": [
+          {
+            "depth": 0.8,
+            "temperature": 33,
+            "oxygen": 8.2,
+            "nutrients": 4.37
+          },
+          {
+            "depth": 2.4,
+            "temperature": 33,
+            "oxygen": 8,
+            "nutrients": 4.38
+          },
+          {
+            "depth": 4,
+            "temperature": 33,
+            "oxygen": 4.7,
+            "nutrients": 4.57
+          },
+          {
+            "depth": 5.5,
+            "temperature": 33,
+            "oxygen": 2.2,
+            "nutrients": 4.76
+          }
+        ],
+        "coordinateSystem": "Lake scene canvas origin at top-left; depth increases downward."
+      }
+    }
+  ],
+  "eutrophic_reservoir": [
+    {
+      "checkpoint": 0,
+      "targetDays": 0,
+      "state": {
+        "scenario": "eutrophic_reservoir",
+        "elapsedDays": 0,
+        "stratificationState": "Weakly stratified",
+        "thermoclineDepth": 7,
+        "mixedDepth": 1.5,
+        "surfaceTemp": 25.2,
+        "middleTemp": 13.8,
+        "bottomTemp": 12.3,
+        "bottomOxygen": 1.92,
+        "surfaceNutrients": 1.24,
+        "surfaceAlgae": 1.78,
+        "bloomRisk": 0.64,
+        "fishRefugeThickness": 9,
+        "habitatCompression": false,
+        "densityInversions": 0,
+        "alerts": [
+          "Deep water oxygen is decreasing",
+          "Bottom layers have entered hypoxia",
+          "Internal nutrient release is likely increasing"
+        ],
+        "layerSample": [
+          {
+            "depth": 0.5,
+            "temperature": 25.2,
+            "oxygen": 7.6,
+            "nutrients": 1
+          },
+          {
+            "depth": 1.5,
+            "temperature": 24.8,
+            "oxygen": 7.4,
+            "nutrients": 1.12
+          },
+          {
+            "depth": 2.5,
+            "temperature": 24.3,
+            "oxygen": 7.3,
+            "nutrients": 1.3
+          },
+          {
+            "depth": 3.5,
+            "temperature": 23.5,
+            "oxygen": 7.1,
+            "nutrients": 1.53
+          }
+        ],
+        "coordinateSystem": "Lake scene canvas origin at top-left; depth increases downward."
+      }
+    },
+    {
+      "checkpoint": 0.5,
+      "targetDays": 90,
+      "state": {
+        "scenario": "eutrophic_reservoir",
+        "elapsedDays": 90,
+        "stratificationState": "Strongly stratified",
+        "thermoclineDepth": 6,
+        "mixedDepth": 1.5,
+        "surfaceTemp": 33,
+        "middleTemp": 14.9,
+        "bottomTemp": 12.4,
+        "bottomOxygen": 0,
+        "surfaceNutrients": 3.01,
+        "surfaceAlgae": 3.17,
+        "bloomRisk": 1.1,
+        "fishRefugeThickness": 0,
+        "habitatCompression": false,
+        "densityInversions": 0,
+        "alerts": [
+          "A stable thermocline has formed",
+          "Bottom layers have entered hypoxia",
+          "Anoxia is developing near the sediments",
+          "Internal nutrient release is likely increasing",
+          "Algal bloom risk is high"
+        ],
+        "layerSample": [
+          {
+            "depth": 0.5,
+            "temperature": 33,
+            "oxygen": 8.1,
+            "nutrients": 1.03
+          },
+          {
+            "depth": 1.5,
+            "temperature": 33,
+            "oxygen": 7.2,
+            "nutrients": 1.43
+          },
+          {
+            "depth": 2.5,
+            "temperature": 32.1,
+            "oxygen": 0,
+            "nutrients": 4.59
+          },
+          {
+            "depth": 3.5,
+            "temperature": 30.5,
+            "oxygen": 0,
+            "nutrients": 5
+          }
+        ],
+        "coordinateSystem": "Lake scene canvas origin at top-left; depth increases downward."
+      }
+    },
+    {
+      "checkpoint": 1,
+      "targetDays": 180,
+      "state": {
+        "scenario": "eutrophic_reservoir",
+        "elapsedDays": 180,
+        "stratificationState": "Strongly stratified",
+        "thermoclineDepth": 7,
+        "mixedDepth": 1.5,
+        "surfaceTemp": 33,
+        "middleTemp": 16.1,
+        "bottomTemp": 12.4,
+        "bottomOxygen": 0,
+        "surfaceNutrients": 3.42,
+        "surfaceAlgae": 2.75,
+        "bloomRisk": 1.1,
+        "fishRefugeThickness": 0,
+        "habitatCompression": false,
+        "densityInversions": 0,
+        "alerts": [
+          "A stable thermocline has formed",
+          "Bottom layers have entered hypoxia",
+          "Anoxia is developing near the sediments",
+          "Internal nutrient release is likely increasing",
+          "Algal bloom risk is high"
+        ],
+        "layerSample": [
+          {
+            "depth": 0.5,
+            "temperature": 33,
+            "oxygen": 8.1,
+            "nutrients": 1.61
+          },
+          {
+            "depth": 1.5,
+            "temperature": 33,
+            "oxygen": 7.2,
+            "nutrients": 2.06
+          },
+          {
+            "depth": 2.5,
+            "temperature": 33,
+            "oxygen": 0,
+            "nutrients": 5
+          },
+          {
+            "depth": 3.5,
+            "temperature": 32.4,
+            "oxygen": 0,
+            "nutrients": 5
+          }
+        ],
+        "coordinateSystem": "Lake scene canvas origin at top-left; depth increases downward."
+      }
+    }
+  ]
+}

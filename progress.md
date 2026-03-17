@@ -1,0 +1,45 @@
+Original prompt: Create an interactive educational web simulator about water column stratification in aquatic systems. The simulator must help students understand how stratification forms, how physicochemical properties change with depth, and how these changes affect aquatic ecosystems.
+
+2026-03-12
+- Initialized project from an empty workspace.
+- Planned a browser-only SPA with modular JS for model, rendering, charts, UI state, and scenarios.
+- Need to implement default summer stratification state, compare mode, guided explanations, live charts, alerts, and testing hooks (`render_game_to_text`, `advanceTime`).
+- Built the first full SPA pass: HTML shell, polished CSS, layered simulation model, scenario presets, canvas lake scene, live profile charts, alerts, compare mode, tooltip inspection, export JSON, how-to modal, and simplified scientific basis panel.
+- Exposed `window.render_game_to_text` and `window.advanceTime(ms)` for deterministic testing.
+- `node --check` failed due sandbox path resolution (`EPERM` on `C:\Users\andvg`), so validation is moving to browser execution instead of static syntax checking.
+- Installed `playwright` locally and alongside the shared test client so the required browser validation could run.
+- Validated the app over a local HTTP server, inspected the lake canvas and full-page screenshots, and confirmed compare mode plus the guide modal render correctly with no browser console errors.
+- Tuned the simulation to slow the default pace and avoid instant deep anoxia: current default pause-state around day 3.7 shows ~28.4 C surface water, a thermocline near 8.8 m, and bottom oxygen around 3.0 mg/L.
+- Revised the turnover logic after a user-reported failure mode: added density-instability adjustment, stronger cooling-driven convective mixing, a simplified monotonic temperature-density relationship for clearer educational turnover behavior, and chunked deterministic `advanceTime`.
+- Verified the default summer scenario still starts strongly stratified, while the dedicated autumn turnover preset now reaches a fully mixed state (`Mixed`, no thermocline, mixed depth ~full water column, zero density inversions).
+- Verified the previously problematic cold/overcast low-wind summer case now erodes stratification to complete mixing instead of creating a warmer metalimnion than the epilimnion.
+- Fixed `System evolution` history retention: the chart now uses a fixed x-axis based on scenario duration and stores sampled history in stable time buckets instead of overwriting the previous point every frame.
+- Validated the time-series canvas visually after long simulation advance; the lines for bottom oxygen, bloom risk, and thermocline depth remain visible instead of disappearing.
+- Rebalanced `bloomRisk` so it depends more clearly on the combination of nutrients, warmth, algae, and stratified retention instead of staying high across most presets.
+- Verified scenario separation after the rebalance: `oligotrophic_lake` now lands low (~0.39), `summer_stable` moderate (~0.61), `eutrophic_reservoir` high (~0.84), and mixed/cool scenarios such as `autumn_turnover` and `wind_mixing` stay low (~0.26 to ~0.29).
+- Revised fish refuge logic to use the largest continuous habitable band (oxygen and temperature together), rather than a crude total count of acceptable layers.
+- Updated the fish rendering so broad refuges distribute fish vertically while compressed refuges cluster them tightly and tint the refuge band as stressed.
+- Validated scenario behavior: `summer_stable` and `eutrophic_reservoir` now show compressed refuges (~5.0 m and ~1.0 m), while `oligotrophic_lake`, `autumn_turnover`, `wind_mixing`, and `rainfall_pulse` retain broad refuges (~14.7 m to ~22.2 m).
+- Reviewed epilimnetic oxygen behavior and found re-aeration was too weak in mixed/cold cases.
+- Increased atmospheric oxygen exchange through the mixed layer, scaled by wind and exchange depth.
+- Revalidated presets: mixed/cool scenarios now keep epilimnetic oxygen near saturation (`autumn_turnover` ~10.8 to 10.9 mg/L at 7.6 C, `wind_mixing` ~8.4 to 8.5 mg/L at 17.6 C, `rainfall_pulse` ~8.9 to 9.0 mg/L at 15.6 C), while warm stratified scenarios remain oxygenated near the surface but still lose oxygen with depth.
+- Reviewed algal growth by scenario and confirmed `eutrophic_reservoir` already had the highest surface algal biomass numerically (~1.38 vs ~0.63 in `summer_stable` and ~0.20 in `oligotrophic_lake`).
+- Strengthened algae visualization in the lake scene so eutrophic conditions show denser green particles and a subtle bloom haze in the photic zone.
+- Rechecked algae through start, midpoint, and end of the key scenarios and found the eutrophic case had been losing too much biomass over long runs because scenario-specific algae bias only affected initialization.
+- Applied scenario-specific algae bias to dynamic photosynthesis/growth and moderated loss for high-bias eutrophic conditions.
+- Revalidated long runs: `eutrophic_reservoir` now remains highest in surface algae at midpoint/end (~3.17 and ~2.75) versus `summer_stable` (~1.24 and ~1.98) and `oligotrophic_lake` (~0.02 and ~0.02).
+- Rebalanced oligotrophic nutrient and oxygen dynamics after the user reported unrealistically high nutrients and deep oxygen depletion in the clear-lake preset.
+- Lowered background respiration, sediment oxygen demand, and mineralization rates in `src/model.js`, made decomposition temperature-sensitive, weakened internal nutrient release, and added a modest nutrient burial/export loss so low-load systems stay nutrient-poor over time.
+- Validated with the required Playwright client loop and inspected the latest screenshot (`output/web-game-http/shot-0.png`), which rendered cleanly aside from the known favicon timeout noise.
+- Verified the full model by stepping start/mid/end with Node and checking full-column values:
+  - `oligotrophic_lake` now stays low-nutrient (`top/mid/bottom nutrients` ~`0.08/0.25/0.26` at start, `0.28/0.29/0.31` at day 90, `0.34/0.30/0.30` at day 180) and retains deep oxygen (`7.36 -> 4.59 -> 2.41 mg/L` bottom).
+  - `summer_stable` and `eutrophic_reservoir` still preserve the intended contrast, with strong deep oxygen loss and much higher nutrient accumulation at depth.
+- Revised the lake scene graphics in `src/renderScene.js` without changing the model logic:
+  - replaced the old back-and-forth sun motion with an elliptical day/night orbit;
+  - added a moon at the opposite side of the orbit;
+  - hid the active astro when it travels below the lake so it appears behind the full scene;
+  - added lateral soil-cut shapes behind the water body;
+  - moved the wind arrows below and left of the weather text block so they no longer overlap `Air`, `Wind`, or `Cloud`.
+- Revalidated graphics with the Playwright client and visual inspection:
+  - daytime screenshot `output/web-game-http/shot-0.png` shows the sun on the upper orbital arc, wind arrows clear of the weather text, and the new lateral earth cut.
+  - nighttime screenshot `night-orbit-check.png` shows the moon above the lake on the opposite side while the sun is fully hidden below the scene.
