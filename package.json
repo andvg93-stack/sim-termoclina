@@ -1,4 +1,10 @@
 {
+  "name": "sim-termoclina",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/serve.cjs",
+    "test:visual": "node scripts/visual-smoke.cjs"
+  },
   "dependencies": {
     "playwright": "^1.58.2"
   }

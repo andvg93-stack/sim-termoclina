@@ -1,524 +1,211 @@
-import { clamp, formatNumber, interpolateColor, lerp, mapRange } from "./utils.js";
+import { clamp, interpolateColor, lerp, mapRange } from './utils.js';
+import { setupCanvas } from './canvas.js';
+import { number } from './i18n.js';
 
-const COLOR_RAMPS = {
-  temperature: ["#154b7d", "#3a95b5", "#9bd7d8", "#f5c867", "#e8834d"],
-  oxygen: ["#862a45", "#c85a4f", "#f1b96b", "#9cd1af", "#2f8e80"],
-  nutrients: ["#dff5fb", "#9dd8ea", "#84c096", "#d2bf5a", "#cf7d3c"],
-  stability: ["#dff1f1", "#9fced6", "#5599ab", "#2d6a7b", "#193f4f"],
+const frame = new Image();
+frame.src = new URL('../assets/lake-frame.png', import.meta.url).href;
+export const sceneReady = frame.decode().catch(() => {});
+
+const RAMPS = {
+  temperature: ['#063b63', '#06577b', '#0884a7', '#64b4b1', '#edc855', '#fa8350'],
+  oxygen: ['#8d355d', '#d87564', '#ebc378', '#78bba0', '#087f8c'],
+  nutrients: ['#e1f4fa', '#b0d9e7', '#9cabde', '#8c72c8', '#633aad'],
+  stability: ['#dff1f1', '#9fced6', '#5599ab', '#2d6a7b', '#193f4f'],
 };
 
-function lakeGeometry(canvas) {
-  return {
-    skyTop: 0,
-    skyBottom: canvas.height * 0.26,
-    waterTop: canvas.height * 0.24,
-    waterBottom: canvas.height * 0.9,
-    left: canvas.width * 0.08,
-    right: canvas.width * 0.93,
-    bottomLeft: canvas.width * 0.14,
-    bottomRight: canvas.width * 0.88,
-  };
+function geometry(width, height) {
+  return { width, height, top: height * .274, bottom: height * .908, left: width * .074, right: width * .926 };
 }
-
-function lakePath(ctx, canvas) {
-  const g = lakeGeometry(canvas);
+function basinPath(ctx, g) {
   ctx.beginPath();
-  ctx.moveTo(g.left, g.waterTop);
-  ctx.quadraticCurveTo(canvas.width * 0.05, g.waterTop - 8, g.bottomLeft, g.waterBottom + 10);
-  ctx.quadraticCurveTo(canvas.width * 0.45, g.waterBottom + 16, canvas.width * 0.54, g.waterBottom);
-  ctx.quadraticCurveTo(canvas.width * 0.68, g.waterBottom + 60, g.bottomRight, g.waterBottom + 10);
-  ctx.quadraticCurveTo(canvas.width * 0.95, g.waterTop + 18, g.right, g.waterTop);
+  ctx.moveTo(g.left, g.top);
+  ctx.bezierCurveTo(g.width * .09, g.height * .55, g.width * .12, g.height * .8, g.width * .185, g.bottom);
+  ctx.lineTo(g.width * .81, g.bottom);
+  ctx.bezierCurveTo(g.width * .88, g.height * .8, g.width * .91, g.height * .55, g.right, g.top);
   ctx.closePath();
 }
-
-function drawAstro(ctx, x, y, radius, palette, rayRotation = 0) {
-  ctx.save();
-  ctx.globalAlpha = palette.alpha;
-  ctx.fillStyle = palette.core;
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  if (palette.glow) {
-    ctx.fillStyle = palette.glow;
-    ctx.beginPath();
-    ctx.arc(x, y, radius * 1.32, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  if (palette.rays) {
-    ctx.strokeStyle = palette.rays;
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 8; i += 1) {
-      const angle = rayRotation + (Math.PI * 2 * i) / 8;
-      ctx.beginPath();
-      ctx.moveTo(x + Math.cos(angle) * (radius + 4), y + Math.sin(angle) * (radius + 4));
-      ctx.lineTo(x + Math.cos(angle) * (radius + 24), y + Math.sin(angle) * (radius + 24));
-      ctx.stroke();
-    }
-  }
-
-  if (palette.craters) {
-    ctx.fillStyle = palette.craters;
-    [
-      [-radius * 0.28, -radius * 0.14, radius * 0.18],
-      [radius * 0.12, radius * 0.08, radius * 0.14],
-      [radius * 0.3, -radius * 0.22, radius * 0.1],
-    ].forEach(([dx, dy, craterRadius]) => {
-      ctx.beginPath();
-      ctx.arc(x + dx, y + dy, craterRadius, 0, Math.PI * 2);
-      ctx.fill();
-    });
-  }
-  ctx.restore();
-}
-
-function drawTerrainCut(ctx, canvas) {
-  const g = lakeGeometry(canvas);
-  const soilGradient = ctx.createLinearGradient(0, g.waterTop, 0, canvas.height);
-  soilGradient.addColorStop(0, "#b99673");
-  soilGradient.addColorStop(0.48, "#937255");
-  soilGradient.addColorStop(1, "#69513d");
-
-  ctx.save();
-  ctx.fillStyle = soilGradient;
-
-  ctx.beginPath();
-  ctx.moveTo(0, g.waterTop);
-  ctx.lineTo(g.left - 18, g.waterTop);
-  ctx.quadraticCurveTo(g.left + 300, g.waterTop + 42, g.bottomLeft - 0, g.waterBottom - 20);
-  ctx.lineTo(g.bottomLeft - 42, canvas.height);
-  ctx.lineTo(0, canvas.height);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(canvas.width, g.waterTop);
-  ctx.lineTo(g.right + 18, g.waterTop);
-  ctx.quadraticCurveTo(g.right - 300, g.waterTop + 54, g.bottomRight + 0, g.waterBottom - 22);
-  ctx.lineTo(g.bottomRight + 42, canvas.height);
-  ctx.lineTo(canvas.width, canvas.height);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(82, 56, 39, 0.22)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(g.left - 18, g.waterTop + 2);
-  ctx.quadraticCurveTo(g.left - 20, g.waterTop + 42, g.bottomLeft - 34, g.waterBottom - 20);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(g.right + 18, g.waterTop + 2);
-  ctx.quadraticCurveTo(g.right + 20, g.waterTop + 54, g.bottomRight + 30, g.waterBottom - 22);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawBackground(ctx, canvas, metrics, params, elapsedDays) {
-  const g = lakeGeometry(canvas);
-  const { skyBottom, waterTop } = g;
-  const gradient = ctx.createLinearGradient(0, 0, 0, skyBottom);
-  gradient.addColorStop(0, "#f9fbfc");
-  gradient.addColorStop(0.55, "#dff2f6");
-  gradient.addColorStop(1, "#c8e7ef");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  const orbitCenterX = canvas.width * 0.51;
-  const orbitCenterY = waterTop + 8;
-  const orbitRadiusX = canvas.width * 0.32;
-  const orbitRadiusY = canvas.height * 0.27;
-  const orbitAngle = elapsedDays * 0.18;
-  const dayBlend = (Math.sin(orbitAngle) + 1) / 2;
-
-  if (dayBlend < 0.46) {
-    ctx.fillStyle = `rgba(30, 52, 78, ${mapRange(dayBlend, 0, 0.46, 0.2, 0.02)})`;
-    ctx.fillRect(0, 0, canvas.width, skyBottom + 12);
-  }
-
-  const sunX = orbitCenterX + Math.cos(orbitAngle) * orbitRadiusX;
-  const sunY = orbitCenterY - Math.sin(orbitAngle) * orbitRadiusY;
-  const moonAngle = orbitAngle + Math.PI;
-  const moonX = orbitCenterX + Math.cos(moonAngle) * orbitRadiusX;
-  const moonY = orbitCenterY - Math.sin(moonAngle) * orbitRadiusY;
-  const atmosphereAlpha = clamp(1 - params.climate.cloudCover * 0.55, 0.4, 1);
-
-  if (sunY <= waterTop - 6) {
-    drawAstro(ctx, sunX, sunY, 28, {
-      alpha: atmosphereAlpha,
-      core: "#ffd17b",
-      glow: "rgba(255, 209, 123, 0.16)",
-      rays: "rgba(255, 209, 123, 0.34)",
-    }, orbitAngle * 0.35);
-  }
-
-  if (moonY <= waterTop - 6) {
-    drawAstro(ctx, moonX, moonY, 20, {
-      alpha: clamp(0.76 - params.climate.cloudCover * 0.24, 0.42, 0.82),
-      core: "#f1f6fb",
-      glow: "rgba(197, 221, 243, 0.12)",
-      craters: "rgba(175, 193, 210, 0.42)",
-    });
-  }
-
-  drawTerrainCut(ctx, canvas);
-
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
-  const cloudCount = Math.round(2 + params.climate.cloudCover * 6);
-  for (let i = 0; i < cloudCount; i += 1) {
-    const x = 130 + i * 120 + Math.sin(elapsedDays * 0.04 + i) * 16;
-    const y = 58 + (i % 2) * 24;
-    ctx.beginPath();
-    ctx.arc(x, y, 20, 0, Math.PI * 2);
-    ctx.arc(x + 22, y - 8, 24, 0, Math.PI * 2);
-    ctx.arc(x + 46, y, 18, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  if (params.climate.windSpeed > 2) {
-    ctx.strokeStyle = "rgba(21, 48, 71, 0.38)";
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 4; i += 1) {
-      const y = 94 + i * 12;
-      const x = canvas.width - 318 + i * 10;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.bezierCurveTo(x + 28, y - 8, x + 62, y + 8, x + 94, y);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x + 84, y - 5);
-      ctx.lineTo(x + 94, y);
-      ctx.lineTo(x + 82, y + 6);
-      ctx.stroke();
-    }
-  }
-
-  ctx.fillStyle = "rgba(21, 48, 71, 0.68)";
-  ctx.font = "600 14px Manrope";
-  const weatherX = canvas.width - 178;
-  ctx.fillText(`Air ${formatNumber(params.climate.airTemp)} C`, weatherX, 34);
-  ctx.fillText(`Wind ${formatNumber(params.climate.windSpeed)} m/s`, weatherX, 56);
-  ctx.fillText(`Cloud ${formatNumber(params.climate.cloudCover * 100, 0)}%`, weatherX, 78);
-}
-
-function clipLake(ctx, canvas) {
-  lakePath(ctx, canvas);
-  ctx.clip();
-}
-
-function colorForLayer(layer, mode, metrics) {
-  let t = 0.5;
-  if (mode === "temperature") {
-    t = mapRange(layer.temperature, 4, 32, 0, 1);
-  } else if (mode === "oxygen") {
-    t = mapRange(layer.oxygen, 0, 11, 0, 1);
-  } else if (mode === "nutrients") {
-    t = mapRange(layer.nutrients, 0.05, 3.2, 0, 1);
-  } else {
+function layerColor(layer, mode, metrics) {
+  let t;
+  if (mode === 'temperature') t = mapRange(layer.temperature, 4, 32, 0, 1);
+  else if (mode === 'oxygen') t = mapRange(layer.oxygen, 0, 11, 0, 1);
+  else if (mode === 'nutrients') t = mapRange(layer.nutrients, .05, 3.2, 0, 1);
+  else {
     const reference = metrics.thermoclineDepth
-      ? Math.abs(layer.depth - metrics.thermoclineDepth) < layer.thickness * 1.3
-        ? 1
-        : metrics.stabilityIndex
-      : 0.15;
+      ? Math.abs(layer.depth - metrics.thermoclineDepth) < layer.thickness * 1.3 ? 1 : metrics.stabilityIndex
+      : .15;
     t = clamp(reference / 1.1, 0, 1);
   }
-  return interpolateColor(COLOR_RAMPS[mode], t);
+  return interpolateColor(RAMPS[mode], t);
 }
-
-function drawWaterColumn(ctx, canvas, state, colorMode) {
-  const g = lakeGeometry(canvas);
-  const { layers, metrics, params } = state;
-  const waterHeight = g.waterBottom - g.waterTop;
-  const layerHeight = waterHeight / layers.length;
-
-  ctx.save();
-  ctx.fillStyle = "rgba(118, 145, 162, 0.1)";
-  lakePath(ctx, canvas);
-  ctx.fill();
-  ctx.restore();
-
-  ctx.save();
-  clipLake(ctx, canvas);
-
-  ctx.fillStyle = "rgba(255,255,255,0.14)";
-  ctx.fillRect(0, g.waterTop, canvas.width, waterHeight);
-
-  layers.forEach((layer, index) => {
-    const y = g.waterTop + index * layerHeight;
-    const fill = colorForLayer(layer, colorMode, metrics);
-    ctx.fillStyle = fill;
-    ctx.fillRect(g.left, y, g.right - g.left, layerHeight + 1);
-
-    if (params.display.showParticles) {
-      ctx.fillStyle = colorMode === "nutrients" ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.18)";
-      const particleCount = Math.max(2, Math.round(layer.turbidity / 2.8));
-      for (let i = 0; i < particleCount; i += 1) {
-        const px = g.left + ((index * 91 + i * 59) % Math.round(g.right - g.left));
-        const drift = Math.sin(state.time.elapsedDays * 0.6 + index * 0.3 + i) * 8;
-        const py = y + ((i * 13 + index * 17) % Math.max(10, Math.round(layerHeight - 4)));
-        ctx.beginPath();
-        ctx.arc(px + drift, py, 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
+function drawWater(ctx, g, state, mode) {
+  const band = (g.bottom - g.top) / state.layers.length;
+  // No lighting tint over the data: the legend and the water use the same ramp.
+  state.layers.forEach((layer, index) => {
+    ctx.fillStyle = layerColor(layer, mode, state.metrics);
+    ctx.fillRect(0, g.top + index * band, g.width, band + 1);
+    if (!state.params.display.showParticles) return;
+    ctx.fillStyle = 'rgba(255,255,255,.18)';
+    for (let i = 0; i < Math.min(18, Math.max(2, Math.round(layer.turbidity / 2.8))); i++) {
+      const x = g.width * (.18 + ((index * 91 + i * 59) % 640) / 1000);
+      const y = g.top + index * band + band * ((i * 13 + index * 17) % 13) / 13;
+      ctx.beginPath(); ctx.arc(x + Math.sin(state.time.elapsedDays * .6 + i) * 3, y, .8, 0, Math.PI * 2); ctx.fill();
     }
   });
-
-  const lightGradient = ctx.createLinearGradient(0, g.waterTop, 0, g.waterBottom);
-  lightGradient.addColorStop(0, `rgba(255, 243, 204, ${clamp(0.28 - params.climate.cloudCover * 0.08, 0.1, 0.3)})`);
-  lightGradient.addColorStop(clamp(params.water.transparency / params.water.maxDepth, 0.14, 0.42), "rgba(255, 247, 221, 0.08)");
-  lightGradient.addColorStop(1, "rgba(17, 37, 53, 0.24)");
-  ctx.fillStyle = lightGradient;
-  ctx.fillRect(g.left, g.waterTop, g.right - g.left, waterHeight);
-
-  if (metrics.bottomOxygen < 2.5) {
-    const oxygenShade = ctx.createLinearGradient(0, g.waterBottom - waterHeight * 0.35, 0, g.waterBottom);
-    oxygenShade.addColorStop(0, "rgba(177, 53, 53, 0)");
-    oxygenShade.addColorStop(1, "rgba(133, 36, 46, 0.28)");
-    ctx.fillStyle = oxygenShade;
-    ctx.fillRect(g.left, g.waterBottom - waterHeight * 0.35, g.right - g.left, waterHeight * 0.35);
-  }
-
-  ctx.restore();
-
-  ctx.strokeStyle = "rgba(255,255,255,0.82)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(g.left - 2, g.waterTop);
-  ctx.lineTo(g.right + 2, g.waterTop);
-  ctx.stroke();
-
-  const sedimentGradient = ctx.createLinearGradient(0, g.waterBottom - 10, 0, canvas.height);
-  sedimentGradient.addColorStop(0, "#8e7356");
-  sedimentGradient.addColorStop(1, "#66513f");
-  ctx.fillStyle = sedimentGradient;
-  ctx.beginPath();
-  ctx.moveTo(g.bottomLeft - 16, g.waterBottom - 10);
-  ctx.quadraticCurveTo(canvas.width * 0.45, g.waterBottom + 30, g.bottomRight + 20, g.waterBottom - 16);
-  ctx.lineTo(canvas.width, canvas.height);
-  ctx.lineTo(0, canvas.height);
-  ctx.closePath();
-  ctx.fill();
 }
-
-function drawThermocline(ctx, canvas, state) {
-  const { thermoclineDepth } = state.metrics;
-  if (!thermoclineDepth) {
-    return;
-  }
-  const g = lakeGeometry(canvas);
-  const y = mapRange(thermoclineDepth, 0, state.params.water.maxDepth, g.waterTop, g.waterBottom);
-  ctx.save();
-  ctx.setLineDash([9, 7]);
-  ctx.strokeStyle = "rgba(255,255,255,0.95)";
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(g.left + 24, y);
-  ctx.lineTo(g.right - 18, y);
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.fillStyle = "rgba(17, 49, 66, 0.78)";
-  ctx.font = "700 13px Manrope";
-  ctx.fillText(`Thermocline ~ ${formatNumber(thermoclineDepth)} m`, g.right - 186, y - 10);
-}
-
-function drawLayerLabels(ctx, canvas, state) {
-  if (!state.params.display.showLabels) {
-    return;
-  }
-  const g = lakeGeometry(canvas);
-  const thermoDepth = state.metrics.thermoclineDepth ?? state.metrics.mixedDepth + 1.5;
-  const epiBottom = clamp(thermoDepth - 2, 2, state.params.water.maxDepth * 0.55);
-  const metaBottom = clamp(thermoDepth + 2.5, epiBottom + 1, state.params.water.maxDepth * 0.82);
-  const labelStyle = (y, title, subtitle) => {
-    ctx.fillStyle = "rgba(15, 40, 58, 0.82)";
-    ctx.font = "700 16px Manrope";
-    ctx.fillText(title, g.left + 26, y);
-    ctx.fillStyle = "rgba(15, 40, 58, 0.6)";
-    ctx.font = "500 12px Manrope";
-    ctx.fillText(subtitle, g.left + 26, y + 16);
-  };
-
-  labelStyle(mapRange(epiBottom * 0.35, 0, state.params.water.maxDepth, g.waterTop, g.waterBottom), "Epilimnion", "Warm, mixed, illuminated");
-  if (state.metrics.thermoclineDepth) {
-    labelStyle(mapRange(thermoDepth, 0, state.params.water.maxDepth, g.waterTop, g.waterBottom), "Metalimnion / Thermocline", "Strongest temperature gradient");
-  }
-  labelStyle(mapRange((metaBottom + state.params.water.maxDepth) * 0.5, 0, state.params.water.maxDepth, g.waterTop, g.waterBottom), "Hypolimnion", "Cool, isolated deep water");
-}
-
-function drawBiota(ctx, canvas, state) {
-  if (!state.params.display.showFishAndAlgae) {
-    return;
-  }
-  const g = lakeGeometry(canvas);
-  const { layers, metrics } = state;
-
-  const refugeTop = metrics.fishRefugeTop ?? layers[1].depth;
-  const refugeBottom = metrics.fishRefugeBottom ?? layers[Math.min(3, layers.length - 1)].depth;
-  const fishTopY = mapRange(refugeTop, 0, state.params.water.maxDepth, g.waterTop, g.waterBottom);
-  const fishBottomY = mapRange(refugeBottom, 0, state.params.water.maxDepth, g.waterTop, g.waterBottom);
-  const compressed = metrics.habitatCompression || metrics.fishRefugeThickness === 0;
-
+function drawBiota(ctx, g, state) {
+  if (!state.params.display.showFishAndAlgae) return;
+  ctx.save(); basinPath(ctx, g); ctx.clip();
+  const { metrics, layers, params } = state;
   if (metrics.fishRefugeThickness > 0) {
-    ctx.save();
-    ctx.fillStyle = compressed ? "rgba(198, 91, 91, 0.08)" : "rgba(67, 105, 135, 0.08)";
-    ctx.fillRect(g.left + 12, fishTopY, g.right - g.left - 24, Math.max(14, fishBottomY - fishTopY));
-    ctx.restore();
+    for (let i = 0; i < 6; i++) {
+      const depth = lerp(metrics.fishRefugeTop, metrics.fishRefugeBottom, (i % 3 + .5) / 3);
+      const y = mapRange(depth, 0, params.water.maxDepth, g.top, g.bottom);
+      const x = g.width * (.43 + i * .066) + Math.sin(state.time.elapsedDays * .8 + i) * 6;
+      const size = g.width < 500 ? 3.5 : 5;
+      ctx.fillStyle = metrics.habitatCompression ? '#ae524fbb' : '#305d6faa';
+      ctx.beginPath(); ctx.ellipse(x, y, size * 1.5, size * .5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x - size, y); ctx.lineTo(x - size * 2.4, y - size * .55); ctx.lineTo(x - size * 2.4, y + size * .55); ctx.closePath(); ctx.fill();
+    }
   }
-
-  ctx.save();
-  ctx.strokeStyle = "rgba(49, 76, 95, 0.86)";
-  ctx.fillStyle = compressed ? "rgba(198, 91, 91, 0.88)" : "rgba(67, 105, 135, 0.88)";
-  for (let i = 0; i < 4; i += 1) {
-    const x = canvas.width * 0.52 + i * 48 + Math.sin(state.time.elapsedDays * 0.8 + i) * 10;
-    const bandT = compressed
-      ? 0.45 + (i % 2) * 0.08
-      : i / 3;
-    const y = lerp(fishTopY, fishBottomY, bandT);
-    ctx.beginPath();
-    ctx.ellipse(x, y, 14, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(x - 12, y);
-    ctx.lineTo(x - 24, y - 7);
-    ctx.lineTo(x - 24, y + 7);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.restore();
-
-  const photicLayers = layers.filter((layer) => layer.depth <= state.params.water.transparency * 1.4);
-  if (state.metrics.surfaceAlgae > 0.9) {
-    const bloomBottom = mapRange(
-      Math.min(state.params.water.maxDepth, state.params.water.transparency * 1.3),
-      0,
-      state.params.water.maxDepth,
-      g.waterTop,
-      g.waterBottom
-    );
-    ctx.fillStyle = `rgba(91, 173, 92, ${clamp(0.08 + state.metrics.surfaceAlgae * 0.08, 0.1, 0.24)})`;
-    ctx.fillRect(g.left, g.waterTop, g.right - g.left, bloomBottom - g.waterTop);
-  }
-
-  photicLayers.slice(0, 6).forEach((layer, index) => {
-    const y = mapRange(layer.depth, 0, state.params.water.maxDepth, g.waterTop, g.waterBottom);
-    const count = clamp(Math.round(layer.algae * 6 + layer.nutrients * 0.8), 1, 18);
-    const radius = clamp(1.4 + layer.algae * 0.95, 1.4, 4.4);
-    const alpha = clamp(0.18 + layer.algae * 0.16, 0.2, 0.72);
-    ctx.fillStyle = `rgba(76, 157, 99, ${alpha})`;
-    for (let i = 0; i < count; i += 1) {
-      const x = g.left + 120 + ((index * 87 + i * 39) % 500);
-      const wobble = Math.sin(state.time.elapsedDays * 0.9 + i + index) * 8;
-      ctx.beginPath();
-      ctx.arc(x + wobble, y + ((i * 11) % 24), radius, 0, Math.PI * 2);
-      ctx.fill();
+  layers.filter(layer => layer.depth <= params.water.transparency * 1.4).slice(0, 6).forEach((layer, j) => {
+    const y = mapRange(layer.depth, 0, params.water.maxDepth, g.top, g.bottom);
+    const count = clamp(Math.round(layer.algae * 6 + layer.nutrients * .8), 1, 22);
+    ctx.fillStyle = `rgba(82,158,89,${clamp(.18 + layer.algae * .16, .2, .7)})`;
+    for (let i = 0; i < count; i++) {
+      const x = g.width * (.18 + ((j * 87 + i * 39) % 640) / 1000);
+      ctx.beginPath(); ctx.arc(x + Math.sin(state.time.elapsedDays + i) * 3, y + (i * 11 % 13), clamp(1 + layer.algae * .45, 1, 2.6), 0, Math.PI * 2); ctx.fill();
     }
   });
+  ctx.restore();
 }
-
-function drawMixingArrows(ctx, canvas, state) {
-  if (state.params.climate.windSpeed < 2.6) {
-    return;
-  }
-  const g = lakeGeometry(canvas);
-  const maxY = mapRange(state.metrics.mixedDepth, 0, state.params.water.maxDepth, g.waterTop, g.waterBottom);
-  ctx.save();
-  ctx.strokeStyle = "rgba(255,255,255,0.72)";
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 4; i += 1) {
-    const x = g.left + 110 + i * 150;
-    const y = g.waterTop + 32 + (i % 2) * 18;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.quadraticCurveTo(x + 16, y + 40, x, Math.min(maxY, y + 74));
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x - 7, Math.min(maxY, y + 66));
-    ctx.lineTo(x, Math.min(maxY, y + 74));
-    ctx.lineTo(x + 7, Math.min(maxY, y + 66));
-    ctx.stroke();
+function drawMixing(ctx, g, state) {
+  if (state.params.climate.windSpeed < 2.6) return;
+  const bottom = mapRange(state.metrics.mixedDepth, 0, state.params.water.maxDepth, g.top, g.bottom);
+  if (bottom < g.top + 14) return;
+  ctx.save(); basinPath(ctx, g); ctx.clip(); ctx.strokeStyle = '#ffffffad'; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i++) {
+    const x = g.width * (.4 + i * .13), y = g.top + 12;
+    const end = Math.min(bottom, y + 35);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 15, y + 15, x, end); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 4, end - 5); ctx.lineTo(x, end); ctx.lineTo(x + 5, end - 3); ctx.stroke();
   }
   ctx.restore();
 }
-
+function label(ctx, text, x, y, font = 12, anchor = 'left', fill = '#0d334bd9') {
+  ctx.font = `600 ${font}px "Segoe UI",Arial,sans-serif`;
+  const width = ctx.measureText(text).width + 16;
+  const left = anchor === 'right' ? x - width : x;
+  ctx.fillStyle = fill; ctx.beginPath(); ctx.roundRect(left, y - font - 7, width, font + 13, 5); ctx.fill();
+  ctx.strokeStyle = '#c4e6f066'; ctx.lineWidth = .75; ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.fillText(text, left + 8, y - 3);
+}
+function drawAnnotations(ctx, g, state) {
+  const { params, metrics } = state;
+  const toY = depth => mapRange(depth, 0, params.water.maxDepth, g.top, g.bottom);
+  const mobile = g.width < 500;
+  const font = mobile ? 11 : 12;
+  const rulerX = mobile ? 25 : g.width * .069;
+  ctx.save(); ctx.strokeStyle = '#ffffffe8'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(rulerX, g.top); ctx.lineTo(rulerX, g.bottom); ctx.stroke();
+  const step = params.water.maxDepth > 40 ? 10 : params.water.maxDepth <= 12 ? 2 : 5;
+  const depths = [];
+  for (let depth = 0; depth < params.water.maxDepth; depth += step) depths.push(depth);
+  depths.push(params.water.maxDepth);
+  ctx.font = `${font}px "Segoe UI",Arial,sans-serif`; ctx.textAlign = 'right';
+  depths.forEach(depth => {
+    const y = toY(depth); ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.moveTo(rulerX - 4, y); ctx.lineTo(rulerX + 4, y); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.shadowColor = '#102532'; ctx.shadowBlur = 3; ctx.fillText(String(depth), rulerX - 7, y + 4); ctx.shadowBlur = 0;
+  });
+  if (!mobile) {
+    ctx.save(); ctx.translate(rulerX - 37, (g.top + g.bottom) / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText('Profundidad (m)', 0, 0); ctx.restore();
+  } else { ctx.fillStyle = '#fff'; ctx.fillText('m', rulerX - 7, g.top - 10); }
+  if (metrics.thermoclineDepth) {
+    const y = toY(metrics.thermoclineDepth);
+    ctx.save(); basinPath(ctx, g); ctx.clip(); ctx.setLineDash([6, 5]); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(g.width, y); ctx.stroke(); ctx.restore();
+    label(ctx, `Termoclina · ${number(metrics.thermoclineDepth)} m`, g.width * .93, y - 9, font, 'right', '#07536ee8');
+  }
+  if (params.display.showLabels) {
+    const x = mobile ? g.width * .19 : g.width * .25;
+    if (!metrics.thermoclineDepth) label(ctx, 'Columna mezclada', x, toY(params.water.maxDepth * .5), font);
+    else {
+      const t = metrics.thermoclineDepth;
+      const epi = Math.max(1, t - 2);
+      label(ctx, 'Epilimnio', x, toY(epi * .45) + 6, font);
+      // On small/deeply compressed layers, move the title to avoid the surface tag.
+      label(ctx, 'Metalimnio', x, Math.min(g.bottom - 40, toY(t) + 30), font);
+      const hypoY = toY((Math.min(t + 2.5, params.water.maxDepth) + params.water.maxDepth) / 2);
+      if (hypoY > toY(t) + 58) label(ctx, 'Hipolimnio', x, hypoY, font);
+    }
+  }
+  ctx.restore();
+}
+function drawSky(ctx, g, state) {
+  const angle = state.time.elapsedDays * .18;
+  const day = (Math.sin(angle) + 1) / 2;
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, g.width, g.top - 2); ctx.clip();
+  if (day < .46) { ctx.fillStyle = `rgba(12,30,60,${mapRange(day, 0, .46, .66, .05)})`; ctx.fillRect(0, 0, g.width, g.top); }
+  const moon = Math.sin(angle) < 0;
+  const orbit = moon ? angle + Math.PI : angle;
+  const x = g.width * (.5 + Math.cos(orbit) * .27);
+  const y = g.top - Math.sin(orbit) * g.height * .2;
+  if (y < g.top - 8) {
+    ctx.globalAlpha = clamp(1 - state.params.climate.cloudCover * .7, .2, 1);
+    ctx.fillStyle = moon ? '#e7effc' : '#ffde8a'; ctx.shadowColor = moon ? '#d3e9ff' : '#ffeab5'; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(x, y, g.width < 500 ? 7 : 11, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  if (state.params.climate.cloudCover > .3) { ctx.fillStyle = `rgba(231,238,245,${state.params.climate.cloudCover * .45})`; ctx.fillRect(0, 0, g.width, g.top); }
+  if (state.params.climate.rainInput > 1) {
+    ctx.globalAlpha = .5; ctx.strokeStyle = '#ebf7ff'; ctx.lineWidth = 1;
+    const count = Math.round(state.params.climate.rainInput * 3);
+    for (let i = 0; i < count; i++) {
+      const x = (i * 71) % g.width, y = ((i * 37 + state.time.elapsedDays * 90) % g.top);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 7); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
 export function getLegend(mode) {
-  if (mode === "temperature") {
-    return [
-      { label: "Cold", color: "#1a4f84" },
-      { label: "Intermediate", color: "#9bd7d8" },
-      { label: "Warm", color: "#ea8a4a" },
-    ];
-  }
-  if (mode === "oxygen") {
-    return [
-      { label: "Low O2", color: "#862a45" },
-      { label: "Moderate", color: "#f1b96b" },
-      { label: "Well oxygenated", color: "#2f8e80" },
-    ];
-  }
-  if (mode === "nutrients") {
-    return [
-      { label: "Low nutrients", color: "#dff5fb" },
-      { label: "Accumulating", color: "#84c096" },
-      { label: "High nutrients", color: "#cf7d3c" },
-    ];
-  }
-  return [
-    { label: "Weak density contrast", color: "#dff1f1" },
-    { label: "Stratified zone", color: "#5599ab" },
-    { label: "Strong barrier", color: "#193f4f" },
-  ];
+  const definitions = {
+    temperature: { title: 'Temperatura', min: 4, max: 32, unit: '°C', ticks: [4, 18, 32] },
+    oxygen: { title: 'Oxígeno', min: 0, max: 11, unit: 'mg/L', ticks: [0, 5.5, 11] },
+    nutrients: { title: 'Nutrientes', min: .05, max: 3.2, unit: 'mg/L', ticks: [.05, 1.6, 3.2] },
+    stability: { title: 'Contraste relativo', min: 0, max: 1.1, unit: '', ticks: [0, .55, 1.1] },
+  };
+  return { ...definitions[mode], colors: RAMPS[mode] };
 }
-
-export function drawLakeScene(canvas, state, colorMode) {
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawBackground(ctx, canvas, state.metrics, state.params, state.time.elapsedDays);
-  drawWaterColumn(ctx, canvas, state, colorMode);
-  drawMixingArrows(ctx, canvas, state);
-  drawThermocline(ctx, canvas, state);
-  drawBiota(ctx, canvas, state);
-  drawLayerLabels(ctx, canvas, state);
-
-  const g = lakeGeometry(canvas);
-  ctx.fillStyle = "rgba(15, 40, 58, 0.72)";
-  ctx.font = "600 13px Manrope";
-  for (let depth = 0; depth <= state.params.water.maxDepth; depth += 5) {
-    const y = mapRange(depth, 0, state.params.water.maxDepth, g.waterTop, g.waterBottom);
-    ctx.fillText(`${depth} m`, 16, y + 4);
-    ctx.strokeStyle = "rgba(255,255,255,0.16)";
-    ctx.beginPath();
-    ctx.moveTo(g.left, y);
-    ctx.lineTo(g.right, y);
-    ctx.stroke();
+export function drawLakeScene(canvas, state, colorMode, selectedDepth = null) {
+  const { ctx, width, height } = setupCanvas(canvas);
+  const g = geometry(width, height);
+  ctx.fillStyle = '#95bfd6'; ctx.fillRect(0, 0, width, height);
+  drawWater(ctx, g, state, colorMode);
+  drawMixing(ctx, g, state);
+  drawBiota(ctx, g, state);
+  if (frame.complete && frame.naturalWidth) {
+    // Crop a little sky to match the approved panoramic composition.
+    ctx.drawImage(frame, 0, -height * .12, width, height * 1.125);
+  } else {
+    ctx.fillStyle = '#65715f'; ctx.fillRect(0, g.bottom, width, height - g.bottom);
+  }
+  drawSky(ctx, g, state);
+  drawAnnotations(ctx, g, state);
+  if (selectedDepth !== null) {
+    const y = mapRange(selectedDepth, 0, state.params.water.maxDepth, g.top, g.bottom);
+    ctx.save(); basinPath(ctx, g); ctx.clip(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); ctx.restore();
   }
 }
-
 export function hitTestLayer(canvas, state, clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
-  const x = ((clientX - rect.left) / rect.width) * canvas.width;
-  const y = ((clientY - rect.top) / rect.height) * canvas.height;
-  const g = lakeGeometry(canvas);
-  if (x < g.left || x > g.right || y < g.waterTop || y > g.waterBottom) {
-    return null;
-  }
-  const relativeDepth = mapRange(y, g.waterTop, g.waterBottom, 0, state.params.water.maxDepth);
-  const index = clamp(Math.floor((relativeDepth / state.params.water.maxDepth) * state.layers.length), 0, state.layers.length - 1);
-  return {
-    layer: state.layers[index],
-    x,
-    y,
-  };
+  const g = geometry(rect.width, rect.height);
+  const x = clientX - rect.left, y = clientY - rect.top;
+  if (y < g.top || y > g.bottom) return null;
+  const t = (y - g.top) / (g.bottom - g.top);
+  const inset = g.width * (.074 + .112 * t * t);
+  if (x < inset || x > g.width - inset) return null;
+  const depth = t * state.params.water.maxDepth;
+  const index = clamp(Math.floor(t * state.layers.length), 0, state.layers.length - 1);
+  return { layer: state.layers[index], depth, x, y };
 }
-
 export function tooltipHtml(layer) {
-  return [
-    `<strong>Depth ${formatNumber(layer.depth)} m</strong>`,
-    `Temperature: ${formatNumber(layer.temperature)} C`,
-    `Dissolved oxygen: ${formatNumber(layer.oxygen)} mg/L`,
-    `pH: ${formatNumber(layer.pH, 2)}`,
-    `Conductivity: ${formatNumber(layer.conductivity, 0)} uS/cm`,
-    `Nutrients: ${formatNumber(layer.nutrients, 2)} mg/L`,
-    `Turbidity: ${formatNumber(layer.turbidity, 1)} NTU`,
-  ].join("<br>");
+  return `<strong>Profundidad ${number(layer.depth)} m</strong><br>Temperatura: ${number(layer.temperature)} °C<br>Oxígeno: ${number(layer.oxygen, 2)} mg/L<br>Nutrientes: ${number(layer.nutrients, 2)} mg/L`;
 }

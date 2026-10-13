@@ -1,15 +1,17 @@
 import { drawCompareChart, drawProfileChart, drawTimeSeriesChart } from "./charts.js";
 import {
-  cloneSimulationState,
   createSimulationState,
   mutateParameterTree,
   stepSimulation,
   structuralParameter,
   summarizeState,
 } from "./model.js";
-import { getLegend, drawLakeScene, hitTestLayer, tooltipHtml } from "./renderScene.js";
+import { getLegend, drawLakeScene, hitTestLayer, tooltipHtml, sceneReady } from "./renderScene.js";
 import { SCENARIOS, buildScenarioParams, getScenarioKeys } from "./scenarios.js";
-import { capitalize, clamp, deepClone, formatNumber } from "./utils.js";
+import { clamp, deepClone } from "./utils.js";
+
+import { t, number as formatNumber, guides } from "./i18n.js";
+import { icon } from "./icons.js";
 
 const CONTROL_SECTIONS = [
   {
@@ -136,10 +138,10 @@ const PROFILE_CONFIG = {
     min: 0,
     max: 32,
     ticks: [0, 8, 16, 24, 32],
-    xLabel: "Temperature (°C)",
+    xLabel: "Temperatura (°C)", unit: "°C",
     lineColor: "#e8834d",
     fillColor: "rgba(232, 131, 77, 0.12)",
-    metricLabel: "Surface temperature",
+    metricLabel: "Temperatura",
     thermocline: true,
   },
   oxygen: {
@@ -147,21 +149,21 @@ const PROFILE_CONFIG = {
     min: 0,
     max: 12,
     ticks: [0, 3, 6, 9, 12],
-    xLabel: "DO (mg/L)",
-    lineColor: "#2f8e80",
+    xLabel: "Oxígeno (mg/L)", unit: "mg/L",
+    lineColor: "#087f8c",
     fillColor: "rgba(47, 142, 128, 0.12)",
-    metricLabel: "Surface oxygen",
+    metricLabel: "Oxígeno disuelto",
     thermocline: true,
   },
   nutrients: {
     property: "nutrients",
     min: 0,
     max: 3.5,
-    ticks: [0, 1, 2, 3],
-    xLabel: "Nutrients (mg/L)",
-    lineColor: "#cf7d3c",
+    ticks: [0, 1, 2, 3.5],
+    xLabel: "Nutrientes (mg/L)", unit: "mg/L",
+    lineColor: "#7448c4",
     fillColor: "rgba(207, 125, 60, 0.12)",
-    metricLabel: "Surface nutrients",
+    metricLabel: "Nutrientes",
     thermocline: false,
   },
 };
@@ -175,9 +177,18 @@ const app = {
   activeState: createSimulationState("summer_stable"),
   baselineState: createSimulationState("summer_stable"),
   hoveredLayer: null,
+  selectedDepth: null,
+  view: "profiles",
 };
 
 const refs = {
+  dayReadout: document.querySelector("#day-readout"),
+  timeProgress: document.querySelector("#time-progress"),
+  primaryAlert: document.querySelector("#primary-alert"),
+  inspector: document.querySelector("#layer-inspector"),
+  guideNote: document.querySelector("#guided-note"),
+  weatherTemp: document.querySelector("#weather-temp"),
+  weatherWind: document.querySelector("#weather-wind"),
   scenarioSelect: document.querySelector("#scenario-select"),
   modeSelect: document.querySelector("#mode-select"),
   playBtn: document.querySelector("#play-btn"),
@@ -218,75 +229,33 @@ function controlId(definition) {
 }
 
 function renderControls() {
-  refs.controlsRoot.innerHTML = CONTROL_SECTIONS.map((section) => `
-    <details ${section.open ? "open" : ""} data-section="${section.id}">
-      <summary>${section.title}</summary>
-      <div class="accordion-grid">
-        <button type="button" class="section-reset" data-reset-section="${section.id}">Reset section</button>
-        ${section.controls.map((control) => renderControl(control)).join("")}
-      </div>
-    </details>
-  `).join("");
+  const sectionIcons = { climate: 'cloud', water: 'lake', quality: 'quality', time: 'time', display: 'settings' };
+  const advanced = new Set(['surfaceAreaFactor', 'initialStratification', 'residenceTime']);
+  refs.controlsRoot.innerHTML = CONTROL_SECTIONS.map(section => {
+    const basic = section.controls.filter(c => !advanced.has(c.key));
+    const extra = section.controls.filter(c => advanced.has(c.key));
+    return `<details ${section.open ? 'open' : ''} data-section="${section.id}">
+      <summary>${icon(sectionIcons[section.id])}${t(section.title)}${icon('chevron')}</summary>
+      <div class="accordion-grid">${basic.map(renderControl).join('')}
+        ${extra.length ? `<details class="advanced-controls"><summary>Más opciones ${icon('chevron')}</summary><div class="accordion-grid">${extra.map(renderControl).join('')}</div></details>` : ''}
+        <button type="button" class="section-reset" data-reset-section="${section.id}">${icon('reset')}Restablecer ${section.id === 'climate' ? 'clima' : section.id === 'water' ? 'lago' : 'sección'}</button>
+      </div></details>`;
+  }).join('');
 }
 
 function renderControl(definition) {
-  const value = getControlValue(definition);
-  const id = controlId(definition);
-  if (definition.type === "range") {
-    return `
-      <div class="control-row" data-control-row="${id}">
-        <div>
-          <div class="control-meta">
-            <label for="${id}">${definition.label}</label>
-            <small>${formatControlValue(definition, value)}</small>
-          </div>
-          <input
-            id="${id}"
-            type="range"
-            min="${definition.min}"
-            max="${definition.max}"
-            step="${definition.step}"
-            value="${value}"
-            data-control="${id}"
-          >
-        </div>
-        <input
-          type="number"
-          min="${definition.min}"
-          max="${definition.max}"
-          step="${definition.step}"
-          value="${value}"
-          data-control-number="${id}"
-        >
-      </div>
-    `;
-  }
-
-  if (definition.type === "select") {
-    return `
-      <div class="field">
-        <span>${definition.label}</span>
-        <select data-control-select="${id}">
-          ${definition.options.map(([optionValue, label]) => `
-            <option value="${optionValue}" ${String(optionValue) === String(value) ? "selected" : ""}>${label}</option>
-          `).join("")}
-        </select>
-      </div>
-    `;
-  }
-
-  if (definition.type === "toggle") {
-    return `
-      <label class="toggle-row">
-        <span>${definition.label}</span>
-        <input type="checkbox" data-control-toggle="${id}" ${value ? "checked" : ""}>
-      </label>
-    `;
-  }
-
-  return `
-    <button type="button" data-control-button="${id}">${definition.label}</button>
-  `;
+  const value = getControlValue(definition), id = controlId(definition);
+  const names = { solarRadiation:'sun', airTemp:'temperature', windSpeed:'wind', cloudCover:'cloud', rainInput:'rain', maxDepth:'lake', transparency:'waves' };
+  const unit = { days:'días', 'mm/day':'mm/d' }[definition.unit] || definition.unit || '';
+  if (definition.type === 'range') return `<div class="control-row" data-control-row="${id}">
+    ${icon(names[definition.key] || (definition.section === 'quality' ? 'quality' : definition.section === 'time' ? 'time' : 'settings'))}
+    <label for="${id}">${t(definition.label)}</label>
+    <input id="${id}" type="range" min="${definition.min}" max="${definition.max}" step="${definition.step}" value="${value}" data-control="${id}" aria-valuetext="${formatControlValue(definition, value)}">
+    <input type="number" min="${definition.min}" max="${definition.max}" step="${definition.step}" value="${value}" data-control-number="${id}" aria-label="${t(definition.label)} (${unit || 'valor'})" inputmode="decimal">
+    <span class="control-unit">${unit}</span></div>`;
+  if (definition.type === 'select') return `<label class="field"><span>${t(definition.label)}</span><select data-control-select="${id}">${definition.options.map(([v,label])=>`<option value="${v}" ${String(v) === String(value) ? 'selected' : ''}>${t(label)}</option>`).join('')}</select></label>`;
+  if (definition.type === 'toggle') return `<label class="toggle-row"><span>${t(definition.label)}</span><input type="checkbox" data-control-toggle="${id}" ${value ? 'checked' : ''}></label>`;
+  return `<button type="button" data-control-button="${id}">${icon('export')}${t(definition.label)}</button>`;
 }
 
 function formatControlValue(definition, value) {
@@ -300,32 +269,22 @@ function formatControlValue(definition, value) {
 }
 
 function syncControlValues() {
-  CONTROL_SECTIONS.forEach((section) => {
-    section.controls.forEach((definition) => {
-      const id = controlId(definition);
-      const value = getControlValue(definition);
-      const range = refs.controlsRoot.querySelector(`[data-control="${id}"]`);
-      const number = refs.controlsRoot.querySelector(`[data-control-number="${id}"]`);
-      const select = refs.controlsRoot.querySelector(`[data-control-select="${id}"]`);
-      const toggle = refs.controlsRoot.querySelector(`[data-control-toggle="${id}"]`);
-      const label = refs.controlsRoot.querySelector(`[data-control-row="${id}"] small`);
-      if (range) {
-        range.value = value;
-      }
-      if (number) {
-        number.value = value;
-      }
-      if (select) {
-        select.value = value;
-      }
-      if (toggle) {
-        toggle.checked = Boolean(value);
-      }
-      if (label) {
-        label.textContent = formatControlValue(definition, value);
-      }
-    });
-  });
+  CONTROL_SECTIONS.forEach(section => section.controls.forEach(definition => {
+    const id = controlId(definition), value = getControlValue(definition);
+    const range = refs.controlsRoot.querySelector(`[data-control="${id}"]`);
+    const numeric = refs.controlsRoot.querySelector(`[data-control-number="${id}"]`);
+    const select = refs.controlsRoot.querySelector(`[data-control-select="${id}"]`);
+    const toggle = refs.controlsRoot.querySelector(`[data-control-toggle="${id}"]`);
+    if (range) {
+      range.value = value;
+      range.style.setProperty('--fill', `${(value - definition.min) / (definition.max - definition.min) * 100}%`);
+      range.setAttribute('aria-valuetext', formatControlValue(definition, value));
+    }
+    if (numeric && document.activeElement !== numeric) numeric.value = value;
+    if (select) select.value = value;
+    if (toggle) toggle.checked = Boolean(value);
+  }));
+  document.querySelectorAll('input[name="color-mode"]').forEach(input => { input.checked = input.value === app.colorMode; });
 }
 
 function currentScenarioDefaults() {
@@ -333,15 +292,17 @@ function currentScenarioDefaults() {
 }
 
 function resetScenario() {
+  hideTooltip(); app.hoveredLayer = null;
   app.activeState = createSimulationState(app.scenarioKey);
   app.baselineState = createSimulationState(app.scenarioKey);
+  app.activeState.params.display.compareWithBaseline = app.mode === 'compare';
+  app.selectedDepth = null;
   app.playing = true;
-  refs.playBtn.textContent = "Pause";
-  syncControlValues();
-  renderAll();
+  syncControlValues(); renderAll();
 }
 
 function rebuildActiveState() {
+  hideTooltip(); app.hoveredLayer = null;
   const params = deepClone(app.activeState.params);
   app.activeState = createSimulationState(app.scenarioKey, params);
   if (app.mode === "compare") {
@@ -358,12 +319,14 @@ function syncBaselineState(targetDays = app.activeState.time.elapsedDays) {
 }
 
 function applyScenarioSelection(scenarioKey) {
+  hideTooltip(); app.hoveredLayer = null;
   app.scenarioKey = scenarioKey;
   app.activeState = createSimulationState(scenarioKey);
   app.baselineState = createSimulationState(scenarioKey);
+  app.activeState.params.display.compareWithBaseline = app.mode === 'compare';
+  app.selectedDepth = null;
   refs.scenarioSelect.value = scenarioKey;
-  syncControlValues();
-  renderAll();
+  syncControlValues(); renderAll();
 }
 
 function parseControlValue(definition, rawValue) {
@@ -392,6 +355,8 @@ function applyControlChange(definition, nextValue) {
   if (definition.section === "display" && definition.key === "compareWithBaseline") {
     app.activeState.params.display.compareWithBaseline = nextValue;
     app.mode = nextValue ? "compare" : app.mode === "compare" ? "free" : app.mode;
+    if (nextValue) app.view = 'compare';
+    else if (app.view === 'compare') app.view = 'profiles';
     refs.modeSelect.value = app.mode;
     if (app.mode === "compare") {
       syncBaselineState();
@@ -410,39 +375,34 @@ function applyControlChange(definition, nextValue) {
 }
 
 function resetSection(sectionId) {
-  const defaults = currentScenarioDefaults()[sectionId];
-  app.activeState.params[sectionId] = deepClone(defaults);
-  if (sectionId === "display") {
-    app.colorMode = "temperature";
+  app.activeState.params[sectionId] = deepClone(currentScenarioDefaults()[sectionId]);
+  if (sectionId === 'display') {
+    app.colorMode = 'temperature';
+    if (app.mode === 'compare') { app.mode = 'free'; refs.modeSelect.value = 'free'; app.view = 'profiles'; }
   }
-  rebuildActiveState();
-  syncControlValues();
+  rebuildActiveState(); syncControlValues(); renderAll();
 }
 
 function handleControlEvent(event) {
   const target = event.target;
-  const datasetId = target.dataset.control || target.dataset.controlNumber || target.dataset.controlSelect || target.dataset.controlToggle;
-  if (!datasetId) {
-    return;
+  const id = target.dataset.control || target.dataset.controlNumber || target.dataset.controlSelect || target.dataset.controlToggle;
+  if (!id || (target.type === 'number' && event.type === 'input')) return;
+  const [sectionId, key] = id.split('.');
+  const definition = CONTROL_SECTIONS.find(s => s.id === sectionId)?.controls.find(c => c.key === key);
+  if (!definition) return;
+  let raw = target.type === 'checkbox' ? target.checked : target.value;
+  if (definition.type === 'range') {
+    if (raw === '' || !Number.isFinite(Number(raw))) { target.value = getControlValue(definition); return; }
+    raw = clamp(Number(raw), definition.min, definition.max);
+    raw = Number((Math.round((raw - definition.min) / definition.step) * definition.step + definition.min).toFixed(6));
+    raw = clamp(raw, definition.min, definition.max);
+    target.value = raw;
   }
-  const [sectionId, key] = datasetId.split(".");
-  const section = CONTROL_SECTIONS.find((item) => item.id === sectionId);
-  const definition = section?.controls.find((control) => control.key === key);
-  if (!definition) {
-    return;
-  }
-  const raw = target.type === "checkbox" ? target.checked : target.value;
   const parsed = parseControlValue(definition, raw);
-  const pairedRange = refs.controlsRoot.querySelector(`[data-control="${datasetId}"]`);
-  const pairedNumber = refs.controlsRoot.querySelector(`[data-control-number="${datasetId}"]`);
-  if (pairedRange && target !== pairedRange) {
-    pairedRange.value = definition.toUI ? definition.toUI(parsed) : parsed;
-  }
-  if (pairedNumber && target !== pairedNumber) {
-    pairedNumber.value = definition.toUI ? definition.toUI(parsed) : parsed;
-  }
+  if (parsed === parseControlValue(definition, getControlValue(definition))) { syncControlValues(); return; }
   applyControlChange(definition, parsed);
-  syncControlValues();
+  if (app.mode === 'compare' && definition.key === 'compareWithBaseline') app.view = 'compare';
+  syncControlValues(); renderAll();
 }
 
 function handleControlButton(event) {
@@ -456,101 +416,75 @@ function handleControlButton(event) {
     return;
   }
   if (target.dataset.controlButton === "display.exportState") {
-    const payload = JSON.stringify(
-      {
-        ui: {
-          scenarioKey: app.scenarioKey,
-          mode: app.mode,
-          colorMode: app.colorMode,
-        },
-        active: summarizeState(app.activeState),
-      },
-      null,
-      2
-    );
-    const blob = new Blob([payload], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `stratification-state-${Date.now()}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportState();
   }
 }
 
 function renderLegend() {
-  refs.legend.innerHTML = getLegend(app.colorMode).map((entry) => `
-    <div class="legend-chip">
-      <span class="legend-swatch" style="background:${entry.color}"></span>
-      <span>${entry.label}</span>
-    </div>
-  `).join("");
+  const legend = getLegend(app.colorMode);
+  refs.legend.innerHTML = `<span class="legend-label">${legend.title}</span><div class="legend-ramp" style="background:linear-gradient(to right,${legend.colors.join(',')})"></div><div class="legend-ticks">${legend.ticks.map((v,i)=>`<span style="left:${(v-legend.min)/(legend.max-legend.min)*100}%">${i === 0 ? '≤ ' : i === legend.ticks.length-1 ? '≥ ' : ''}${formatNumber(v, Number.isInteger(v) ? 0 : String(v).split('.')[1].length)} ${legend.unit}</span>`).join('')}</div>`;
 }
 
 function renderStatusCards() {
-  const metrics = app.activeState.metrics;
+  const m = app.activeState.metrics;
   const cards = [
-    { title: "Stratification", value: metrics.stratificationState, note: metrics.stabilityIndex > 0.75 ? "Stable density barrier" : "Vertical exchange more likely" },
-    { title: "Thermocline", value: metrics.thermoclineDepth ? `${formatNumber(metrics.thermoclineDepth)} m` : "Not distinct", note: "Strongest temperature gradient" },
-    { title: "Surface temp", value: `${formatNumber(metrics.surfaceTemp)} °C`, note: "Controls density and metabolism" },
-    { title: "Bottom oxygen", value: `${formatNumber(metrics.bottomOxygen, 2)} mg/L`, note: metrics.bottomOxygen < 2 ? "Critical for benthic fauna" : "Deep-water respiration balance" },
-    { title: "Bloom risk", value: metrics.bloomRisk > 0.72 ? "High" : metrics.bloomRisk > 0.42 ? "Moderate" : "Low", note: "Depends on nutrients, warmth, stability" },
-    { title: "Ecosystem", value: metrics.ecosystemStatus, note: metrics.habitatCompression ? "Fish refuge is compressed" : "Habitat remains broader" },
+    {icon:'temperature', title:'Superficie', value:`${formatNumber(m.surfaceTemp)} °C`, note:'Temperatura del agua'},
+    {icon:'waves', title:'Termoclina', value:m.thermoclineDepth ? `${formatNumber(m.thermoclineDepth)} m` : 'Sin definir', note:'Profundidad de la termoclina'},
+    {icon:'oxygen', title:'Oxígeno profundo', value:`${formatNumber(m.bottomOxygen,2)} mg/L`, note:`A ${app.activeState.params.water.maxDepth} m de profundidad`},
+    {icon:'waves', title:'Estratificación', value:t(m.stratificationState), note:m.stabilityIndex > .75 ? 'Alta estabilidad de la columna' : 'Mayor intercambio vertical'},
   ];
-  refs.statusCards.innerHTML = cards.map((card) => `
-    <div class="kpi-card">
-      <h3>${card.title}</h3>
-      <div class="kpi-value">${card.value}</div>
-      <div class="kpi-note">${card.note}</div>
-    </div>
-  `).join("");
+  refs.statusCards.innerHTML = cards.map(c=>`<div class="kpi-card">${icon(c.icon)}<div><h3>${c.title}</h3><div class="kpi-value">${c.value}</div></div><div class="kpi-note">${c.note}</div></div>`).join('');
+  const { time, params } = app.activeState;
+  refs.dayReadout.textContent = `Día ${Math.floor(time.elapsedDays)} / ${params.time.duration}`;
+  refs.timeProgress.style.width = `${clamp(time.elapsedDays / params.time.duration * 100, 0, 100)}%`;
+  refs.weatherTemp.textContent = `${formatNumber(params.climate.airTemp,1)} °C`;
+  refs.weatherWind.textContent = `${formatNumber(params.climate.windSpeed)} m/s`;
+  refs.playBtn.innerHTML = `${icon(app.playing ? 'pause' : 'play')}${app.playing ? 'Pausar' : 'Continuar'}`;
+  refs.playBtn.setAttribute('aria-pressed', String(app.playing));
 }
 
 function renderAlerts() {
-  refs.alertsList.innerHTML = app.activeState.alerts.map((alert) => `
-    <article class="alert-card alert-${alert.level}">
-      <strong>${alert.title}</strong>
-      <p>${alert.detail}</p>
-    </article>
-  `).join("");
+  const priorities = { info:0, warning:1, danger:2 };
+  const alerts = [...app.activeState.alerts].sort((a,b)=>priorities[b.level]-priorities[a.level]);
+  refs.alertsList.innerHTML = alerts.map(a=>`<article class="alert-card alert-${a.level}"><strong>${t(a.title)}</strong><p>${t(a.detail)}</p></article>`).join('') + `<article class="alert-card"><strong>Estado ecológico: ${t(app.activeState.metrics.ecosystemStatus)}</strong><p>Riesgo de floración: ${formatNumber(app.activeState.metrics.bloomRisk * 100,0)} %. Refugio de peces: ${formatNumber(app.activeState.metrics.fishRefugeThickness)} m.</p></article>`;
+  const first = alerts[0];
+  refs.primaryAlert.dataset.level = first?.level || 'info';
+  refs.primaryAlert.innerHTML = first ? `${icon('info')}<strong>${t(first.title)}</strong><p>${t(first.detail)}</p>` : '';
 }
 
 function renderExplanation() {
-  refs.explainWhat.textContent = app.activeState.explanation.what;
-  refs.explainWhy.textContent = app.activeState.explanation.why;
-  refs.explainImpact.textContent = app.activeState.explanation.impact;
+  const m = app.activeState.metrics;
+  const mixed = m.stratificationState === 'Mixed';
+  refs.explainWhat.textContent = mixed ? 'El lago se aproxima a un perfil isotérmico y sus capas se mezclan.' : `La columna presenta un epilimnio cálido, una zona de transición cerca de ${formatNumber(m.thermoclineDepth ?? 0)} m y un hipolimnio más frío.`;
+  refs.explainWhy.textContent = mixed ? 'El enfriamiento y el viento reducen las diferencias de densidad, permitiendo el intercambio entre la superficie y el fondo.' : 'La radiación solar calienta la superficie. La diferencia de densidad resiste la mezcla por viento y limita el transporte de oxígeno y nutrientes a través de la termoclina.';
+  const priority = [...app.activeState.alerts].sort((a,b)=>({danger:2,warning:1,info:0}[b.level])-({danger:2,warning:1,info:0}[a.level]))[0];
+  refs.explainImpact.textContent = t(priority?.detail || 'Conditions remain within a moderate range');
+  refs.guideNote.hidden = app.mode !== 'guided';
+  refs.guideNote.textContent = guides[app.scenarioKey];
 }
 
 function renderCompare() {
-  const showCompare = app.mode === "compare";
-  refs.comparePanel.hidden = !showCompare;
-  if (!showCompare) {
-    return;
-  }
-  drawCompareChart(refs.compareTempChart, app.activeState, app.baselineState, "temperature", PROFILE_CONFIG.temperature);
-  drawCompareChart(refs.compareOxygenChart, app.activeState, app.baselineState, "oxygen", PROFILE_CONFIG.oxygen);
-  refs.compareStatus.innerHTML = `
-    <div class="compare-pill"><strong>Baseline:</strong> ${SCENARIOS[app.scenarioKey].label} remains at default forcing.</div>
-    <div class="compare-pill"><strong>Modified:</strong> ${app.activeState.metrics.stratificationState}, bottom O2 ${formatNumber(app.activeState.metrics.bottomOxygen, 2)} mg/L.</div>
-    <div class="compare-pill"><strong>Difference:</strong> Temperature gradient ${formatNumber(app.activeState.metrics.surfaceTemp - app.baselineState.metrics.surfaceTemp, 1)} C at the surface and ${formatNumber(app.activeState.metrics.bottomOxygen - app.baselineState.metrics.bottomOxygen, 2)} mg/L at the bottom.</div>
-  `;
+  if (app.view !== 'compare') return;
+  drawCompareChart(refs.compareTempChart, app.activeState, app.baselineState, 'temperature', PROFILE_CONFIG.temperature);
+  drawCompareChart(refs.compareOxygenChart, app.activeState, app.baselineState, 'oxygen', PROFILE_CONFIG.oxygen);
+  const m = app.activeState.metrics, b = app.baselineState.metrics;
+  refs.compareStatus.innerHTML = `<div class="compare-pill"><strong>Base:</strong> ${t(SCENARIOS[app.scenarioKey].label)} conserva sus condiciones originales.</div><div class="compare-pill"><strong>Tus ajustes:</strong> estratificación ${t(m.stratificationState).toLowerCase()}, oxígeno profundo ${formatNumber(m.bottomOxygen,2)} mg/L.</div><div class="compare-pill"><strong>Diferencia:</strong> ${formatNumber(m.surfaceTemp-b.surfaceTemp)} °C en superficie y ${formatNumber(m.bottomOxygen-b.bottomOxygen,2)} mg/L de oxígeno en el fondo.</div>`;
 }
 
 function renderCharts() {
-  drawProfileChart(refs.tempChart, app.activeState, "temperature", PROFILE_CONFIG.temperature);
-  drawProfileChart(refs.oxygenChart, app.activeState, "oxygen", PROFILE_CONFIG.oxygen);
-  drawProfileChart(refs.nutrientChart, app.activeState, "nutrients", PROFILE_CONFIG.nutrients);
-  drawTimeSeriesChart(refs.timeChart, app.activeState);
+  if (app.view === 'profiles') {
+    drawProfileChart(refs.tempChart, app.activeState, 'temperature', PROFILE_CONFIG.temperature, app.selectedDepth);
+    drawProfileChart(refs.oxygenChart, app.activeState, 'oxygen', PROFILE_CONFIG.oxygen, app.selectedDepth);
+    drawProfileChart(refs.nutrientChart, app.activeState, 'nutrients', PROFILE_CONFIG.nutrients, app.selectedDepth);
+  }
+  if (app.view === 'evolution') drawTimeSeriesChart(refs.timeChart, app.activeState);
 }
 
 function renderAll() {
-  drawLakeScene(refs.lakeCanvas, app.activeState, app.colorMode);
-  renderLegend();
-  renderStatusCards();
-  renderAlerts();
-  renderExplanation();
-  renderCharts();
-  renderCompare();
+  syncView();
+  drawLakeScene(refs.lakeCanvas, app.activeState, app.colorMode, app.selectedDepth);
+  renderLegend(); renderStatusCards(); renderAlerts(); renderExplanation(); renderCharts(); renderCompare(); renderInspector();
+  if (app.hoveredLayer && !refs.tooltip.hidden) refs.tooltip.innerHTML = tooltipHtml(app.hoveredLayer);
 }
 
 function daysPerSecondFor(state) {
@@ -567,16 +501,17 @@ function stepByRealSeconds(realSeconds) {
   }
   if (app.activeState.time.elapsedDays >= app.activeState.params.time.duration) {
     app.playing = false;
-    refs.playBtn.textContent = "Play";
+
   }
 }
 
 function showTooltip(payload, event) {
   refs.tooltip.hidden = false;
   refs.tooltip.innerHTML = tooltipHtml(payload.layer);
-  const wrapRect = refs.lakeCanvas.parentElement.getBoundingClientRect();
-  refs.tooltip.style.left = `${event.clientX - wrapRect.left + 16}px`;
-  refs.tooltip.style.top = `${event.clientY - wrapRect.top + 16}px`;
+  const rect = refs.lakeCanvas.parentElement.getBoundingClientRect();
+  const tip = refs.tooltip.getBoundingClientRect();
+  refs.tooltip.style.left = `${clamp(event.clientX-rect.left+12, 4, rect.width-tip.width-4)}px`;
+  refs.tooltip.style.top = `${clamp(event.clientY-rect.top+12, 4, rect.height-tip.height-4)}px`;
 }
 
 function hideTooltip() {
@@ -584,84 +519,95 @@ function hideTooltip() {
 }
 
 function handleModeChange(value) {
-  app.mode = value;
-  app.activeState.params.display.compareWithBaseline = value === "compare";
-  if (value === "compare") {
-    syncBaselineState();
-  }
-  syncControlValues();
-  renderAll();
+  app.mode = value; refs.modeSelect.value = value;
+  app.activeState.params.display.compareWithBaseline = value === 'compare';
+  if (value === 'compare') { syncBaselineState(); app.view = 'compare'; }
+  else if (app.view === 'compare') app.view = 'profiles';
+  syncControlValues(); renderAll();
 }
 
 function populateScenarioOptions() {
   refs.scenarioSelect.innerHTML = getScenarioKeys().map((key) => `
-    <option value="${key}">${SCENARIOS[key].label}</option>
+    <option value="${key}">${t(SCENARIOS[key].label)}</option>
   `).join("");
   refs.scenarioSelect.value = app.scenarioKey;
 }
 
 function attachEvents() {
-  refs.scenarioSelect.addEventListener("change", (event) => {
-    applyScenarioSelection(event.target.value);
-  });
-
-  refs.modeSelect.addEventListener("change", (event) => {
-    handleModeChange(event.target.value);
-  });
-
-  refs.speedSelect.addEventListener("change", (event) => {
-    app.speed = Number(event.target.value);
-  });
-
-  refs.playBtn.addEventListener("click", () => {
-    app.playing = !app.playing;
-    refs.playBtn.textContent = app.playing ? "Pause" : "Play";
-  });
-
-  refs.resetBtn.addEventListener("click", () => {
-    resetScenario();
-  });
-
-  refs.guideBtn.addEventListener("click", () => refs.guideModal.showModal());
-  refs.closeGuideBtn.addEventListener("click", () => refs.guideModal.close());
-  refs.guideModal.addEventListener("click", (event) => {
-    if (event.target === refs.guideModal) {
-      refs.guideModal.close();
+  refs.scenarioSelect.addEventListener('change', e => applyScenarioSelection(e.target.value));
+  refs.modeSelect.addEventListener('change', e => handleModeChange(e.target.value));
+  refs.speedSelect.addEventListener('change', e => { app.speed = Number(e.target.value); });
+  refs.playBtn.addEventListener('click', () => {
+    if (!app.playing && app.activeState.time.elapsedDays >= app.activeState.params.time.duration) {
+      resetScenario(); return;
     }
+    app.playing = !app.playing; renderAll();
   });
-
-  refs.controlsRoot.addEventListener("input", handleControlEvent);
-  refs.controlsRoot.addEventListener("change", handleControlEvent);
-  refs.controlsRoot.addEventListener("click", handleControlButton);
-
-  document.querySelectorAll('input[name="color-mode"]').forEach((input) => {
-    input.addEventListener("change", (event) => {
-      app.colorMode = event.target.value;
-      syncControlValues();
-      renderAll();
+  refs.resetBtn.addEventListener('click', resetScenario);
+  refs.guideBtn.addEventListener('click', () => refs.guideModal.showModal());
+  refs.closeGuideBtn.addEventListener('click', () => refs.guideModal.close());
+  refs.guideModal.addEventListener('click', e => { if (e.target === refs.guideModal) refs.guideModal.close(); });
+  refs.controlsRoot.addEventListener('input', handleControlEvent);
+  refs.controlsRoot.addEventListener('change', handleControlEvent);
+  refs.controlsRoot.addEventListener('click', handleControlButton);
+  document.querySelector('#export-btn').addEventListener('click', () => exportState());
+  document.querySelector('#fullscreen-btn').addEventListener('click', toggleFullscreen);
+  document.querySelector('#parameters-btn').addEventListener('click', e => {
+    const panel = document.querySelector('.controls-panel');
+    panel.classList.toggle('mobile-collapsed');
+    e.currentTarget.setAttribute('aria-expanded', String(!panel.classList.contains('mobile-collapsed')));
+  });
+  document.querySelector('#alerts-btn').addEventListener('click', e => {
+    refs.alertsList.hidden = !refs.alertsList.hidden;
+    e.currentTarget.setAttribute('aria-expanded', String(!refs.alertsList.hidden));
+    e.currentTarget.textContent = refs.alertsList.hidden ? 'Ver alertas' : 'Ocultar alertas';
+    if (!refs.alertsList.hidden && innerWidth <= 820) refs.alertsList.scrollIntoView({ block: 'center' });
+  });
+  document.querySelectorAll('input[name="color-mode"]').forEach(input => input.addEventListener('change', e => {
+    app.colorMode = e.target.value; syncControlValues(); renderAll();
+  }));
+  refs.lakeCanvas.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse') return;
+    const hit = hitTestLayer(refs.lakeCanvas, app.activeState, e.clientX, e.clientY);
+    app.hoveredLayer = hit?.layer ?? null;
+    if (hit) showTooltip(hit,e); else hideTooltip();
+  });
+  refs.lakeCanvas.addEventListener('pointerleave', () => { app.hoveredLayer = null; hideTooltip(); });
+  refs.lakeCanvas.addEventListener('click', e => {
+    const hit = hitTestLayer(refs.lakeCanvas,app.activeState,e.clientX,e.clientY);
+    if (hit) { app.selectedDepth = hit.layer.depth; hideTooltip(); renderAll(); }
+  });
+  refs.inspector.addEventListener('click', e => { if (e.target.closest('button')) { app.selectedDepth = null; renderAll(); refs.lakeCanvas.focus(); } });
+  refs.lakeCanvas.addEventListener('keydown', e => {
+    if (!['ArrowUp','ArrowDown','Home','End','Escape'].includes(e.key)) return;
+    e.preventDefault();
+    const layers = app.activeState.layers;
+    let index = app.selectedDepth === null ? 0 : layers.reduce((best,l,i)=>Math.abs(l.depth-app.selectedDepth)<Math.abs(layers[best].depth-app.selectedDepth)?i:best,0);
+    if (e.key === 'Escape') app.selectedDepth = null;
+    else {
+      index = e.key === 'Home' ? 0 : e.key === 'End' ? layers.length-1 : clamp(index + (e.key === 'ArrowUp' ? -1 : 1),0,layers.length-1);
+      app.selectedDepth = layers[index].depth;
+    }
+    renderAll();
+  });
+  const tabs = [...document.querySelectorAll('[data-view]')];
+  tabs.forEach((tab,index) => {
+    tab.addEventListener('click', () => selectView(tab.dataset.view));
+    tab.addEventListener('keydown', e => {
+      if (!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return;
+      e.preventDefault();
+      const next = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length-1 : (index + (e.key === 'ArrowRight' ? 1 : -1)+tabs.length)%tabs.length;
+      tabs[next].focus(); selectView(tabs[next].dataset.view);
     });
   });
-
-  refs.lakeCanvas.addEventListener("mousemove", (event) => {
-    const hit = hitTestLayer(refs.lakeCanvas, app.activeState, event.clientX, event.clientY);
-    app.hoveredLayer = hit?.layer ?? null;
-    if (hit) {
-      showTooltip(hit, event);
-    } else {
-      hideTooltip();
-    }
+  document.addEventListener('keydown', e => {
+    if (e.key.toLowerCase() === 'f' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.target.closest('input,select,textarea,[contenteditable]') && !refs.guideModal.open) toggleFullscreen();
   });
-  refs.lakeCanvas.addEventListener("mouseleave", hideTooltip);
-
-  document.addEventListener("keydown", async (event) => {
-    if (event.key.toLowerCase() === "f") {
-      if (!document.fullscreenElement) {
-        await refs.lakeCanvas.parentElement.requestFullscreen?.();
-      } else {
-        await document.exitFullscreen?.();
-      }
-    }
-  });
+  let resizeFrame;
+  const resize = () => { cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(renderAll); };
+  new ResizeObserver(resize).observe(refs.lakeCanvas.parentElement);
+  window.addEventListener('resize', resize);
+  document.addEventListener('fullscreenchange', resize);
 }
 
 function installTestingHooks() {
@@ -689,6 +635,56 @@ function installTestingHooks() {
   };
 }
 
+
+function syncView() {
+  document.querySelectorAll('[data-view]').forEach(tab => {
+    const selected = tab.dataset.view === app.view;
+    tab.setAttribute('aria-selected', String(selected)); tab.tabIndex = selected ? 0 : -1;
+    document.getElementById(tab.getAttribute('aria-controls')).hidden = !selected;
+  });
+}
+function selectView(view) {
+  if (view === 'compare' && app.mode !== 'compare') { handleModeChange('compare'); return; }
+  app.view = view; renderAll();
+}
+function renderInspector() {
+  refs.inspector.hidden = app.selectedDepth === null;
+  if (app.selectedDepth === null) return;
+  app.selectedDepth = clamp(app.selectedDepth,0,app.activeState.params.water.maxDepth);
+  const layer = app.activeState.layers.reduce((best,l)=>Math.abs(l.depth-app.selectedDepth)<Math.abs(best.depth-app.selectedDepth)?l:best);
+  const html = `<strong>${formatNumber(layer.depth)} m</strong><span>${formatNumber(layer.temperature)} °C</span><span>O₂ ${formatNumber(layer.oxygen,2)} mg/L</span><span>Nutrientes ${formatNumber(layer.nutrients,2)} mg/L</span><span>pH ${formatNumber(layer.pH,2)}</span><span>${formatNumber(layer.conductivity,0)} µS/cm</span><span>${formatNumber(layer.turbidity)} NTU</span><button type="button" aria-label="Cerrar lectura de profundidad">Cerrar</button>`;
+  // Preserve keyboard focus on the close button while the simulation advances.
+  if (refs.inspector.innerHTML !== html && document.activeElement !== refs.inspector.querySelector('button')) refs.inspector.innerHTML = html;
+}
+async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await refs.lakeCanvas.parentElement.requestFullscreen?.();
+  } catch { /* A browser may disable fullscreen; the scene remains usable. */ }
+}
+
+function exportState() {
+    const payload = JSON.stringify(
+      {
+        ui: {
+          scenarioKey: app.scenarioKey,
+          mode: app.mode,
+          colorMode: app.colorMode,
+        },
+        active: summarizeState(app.activeState),
+      },
+      null,
+      2
+    );
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `stratification-state-${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
 function bootstrap() {
   populateScenarioOptions();
   renderControls();
@@ -697,13 +693,16 @@ function bootstrap() {
   installTestingHooks();
   renderAll();
 
+  sceneReady.then(renderAll);
+  let lastRender = 0;
   let lastFrame = performance.now();
   const frame = (timestamp) => {
     const deltaSeconds = clamp((timestamp - lastFrame) / 1000, 0, 0.15);
     lastFrame = timestamp;
     if (app.playing) {
       stepByRealSeconds(deltaSeconds);
-      renderAll();
+      if (timestamp - lastRender >= 100) { renderAll(); lastRender = timestamp; }
+      else drawLakeScene(refs.lakeCanvas, app.activeState, app.colorMode, app.selectedDepth);
     }
     requestAnimationFrame(frame);
   };
